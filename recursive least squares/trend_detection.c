@@ -12,7 +12,7 @@
  *
  * The functions utilize Recursive Least Squares (RLS) regression from `rls_polynomial_regression.h`
  * to calculate first-order and second-order gradients over a sliding window, offering a robust
- * method for online trend analysis.
+ * method for online trend analysis.Calculating
  */
 
 #include "trend_detection.h"
@@ -603,7 +603,7 @@ PeakPosition determineMoveDirection(
     }
 
     // **Debugging Output**
-    //DEBUG_PRINT_2("Adjusted Increase Count: %u, Adjusted Decrease Count: %u\n", increaseCount, decreaseCount);
+    printf("Adjusted Increase Count: %u, Adjusted Decrease Count: %u\n", increaseCount, decreaseCount);
     //DEBUG_PRINT_2("Adjusted Longest Increase: startIndex=%u, endIndex=%u\n", increaseStartIndex, increaseEndIndex);
     //DEBUG_PRINT_2("Adjusted Longest Decrease: startIndex=%u, endIndex=%u\n", decreaseStartIndex, decreaseEndIndex);
 
@@ -611,7 +611,7 @@ PeakPosition determineMoveDirection(
     uint16_t trendThreshold = TREND_THRESHOLD; // e.g., TREND_THRESHOLD = RLS_WINDOW / 4
 
     // **Debugging Output**
-    printf("Trend Threshold: %u\n", trendThreshold);
+    DEBUG_PRINT_1("Trend Threshold: %u\n", trendThreshold);
 
     // **Step 3: Initialize the moveDirection to UNDECIDED**
     PeakPosition moveDirection = UNDECIDED;
@@ -641,22 +641,33 @@ PeakPosition determineMoveDirection(
     if (!gradientsWithinUndecidedThresholds && (increaseCount >= trendThreshold || decreaseCount >= trendThreshold)) {
         // **Sub-case 1: Significant increase count and gradients**
         if (increaseCount >= trendThreshold && decreaseCount < trendThreshold) {
-            DEBUG_PRINT_2("Condition Met: Significant increase count and gradients.\n");
+            printf("Condition Met: Significant increase count and gradients.\n");
             moveDirection = RIGHT_SIDE;
         }
         // **Sub-case 2: Significant decrease count and gradients**
         else if (decreaseCount >= trendThreshold && increaseCount < trendThreshold) {
-            DEBUG_PRINT_2("Condition Met: Significant decrease count and gradients.\n");
+            printf("Condition Met: Significant decrease count and gradients.\n");
             moveDirection = LEFT_SIDE;
         }
         // **Sub-case 3: Both counts are significant**
-        else if (increaseCount >= trendThreshold && decreaseCount >= trendThreshold) {
-            DEBUG_PRINT_2("Condition Met: Both counts significant; proceeding to peak verification.\n");
-            // Proceed to peak verification
-            moveDirection = UNDECIDED; // Temporarily set to UNDECIDED until further checks
+        else if (increaseCount >= trendThreshold && decreaseCount >= trendThreshold) {                         // TAMAMEN SAÇMA SAPAN BİR LOGIC. 
+           
+           // Compare the sum of gradients from the passed-in structs
+            double sumIncreaseGradients = longestIncrease->sumGradients;
+            double sumDecreaseGradients = longestDecrease->sumGradients;
+
+            if (fabs(sumDecreaseGradients) > fabs(sumIncreaseGradients)) {
+                printf("Decrease trend sum is higher. Moving LEFT.\n");
+                moveDirection = LEFT_SIDE;
+            } else {
+                printf("Increase trend sum is higher. Moving RIGHT.\n");
+                moveDirection = RIGHT_SIDE;
+            }
         }
     } else {
         DEBUG_PRINT_1("Counts below threshold or gradients within undecided thresholds; proceeding to additional checks.\n");
+        
+        //thresholdu açan
 
         // **Sub-step 6.1: Check if gradients are within undecided thresholds**
         if (gradientsWithinUndecidedThresholds) {

@@ -36,9 +36,13 @@ int main() {
     PrepareBaseSweep(&rawBaseSweep, rawData); 
     currentRawSweep = &rawBaseSweep;
     
-    int start_index = 50;
+    int start_index = 220;
     startSlidingWindowAnalysis(currentRawSweep, start_index, myCallbackFunction); 
    
     return 0;
 }
 
+//234 gives error. 
+//224 gives error
+//220 gives error.
+//110 is ok.

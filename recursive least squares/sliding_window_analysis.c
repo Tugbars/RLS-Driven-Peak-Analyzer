@@ -519,6 +519,24 @@ static void reset_centering_flags(void) {
 
 
 /**
+ * @brief Converts a MoveDirection enum to the corresponding integer argument
+ *        for move_window_and_update_if_needed.
+ *
+ * @param moveDirection The MoveDirection enum value to convert.
+ * @return int The corresponding integer argument for the move_window_and_update_if_needed function.
+ */
+static int convertMoveDirectionToArgument(MoveDirection moveDirection) {
+    switch (moveDirection) {
+        case MOVE_LEFT:
+            return LEFT_SIDE;  // Assuming LEFT_SIDE is defined as the integer expected
+        case MOVE_RIGHT:
+            return RIGHT_SIDE; // Assuming RIGHT_SIDE is defined as the integer expected
+        default:
+            return -1;  // Invalid direction; handle this case appropriately
+    }
+}
+
+/**
  * @brief Entry function for the SWP_PEAK_CENTERING state, orchestrating the peak centering process.
  *
  * This function serves as the main entry point for peak centering within the SWP_PEAK_CENTERING state.
@@ -567,8 +585,11 @@ static void OnEntryPeakCentering(void) {
         // Handle invalid trend data
     //if (handle_invalid_trend_data(&gradient_trends)) return;
     
+   // Convert moveDirection to the appropriate argument for move_window_and_update_if_needed
+    int directionArg = convertMoveDirectionToArgument(centeringResult.moveDirection);
+    
     if(!centeringResult.isCentered){
-            move_window_and_update_if_needed(centeringResult.moveDirection,  centeringResult.moveAmount);
+            move_window_and_update_if_needed(directionArg,  centeringResult.moveAmount);
             //case SWP_PEAK_FINDING_ANALYSIS: will determine if this is really centered or not, after this function.
     }
     
@@ -759,11 +780,11 @@ static void check_peak_centering_and_verify(void) { //trackGradients would solve
    if (isCentered) {
         printf("Valid negative trend with adequate peak capture detected.\n");
         printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
-        currentStatus.isNotCentered = 0;
+        currentStatus.isCentered = 1;
         perform_peak_verification();
     } else {
         printf("Negative trend not found or peak not adequately captured.\n");
-        currentStatus.isNotCentered = 1;
+        currentStatus.isCentered = 0;
     }
 } 
 
@@ -1190,7 +1211,7 @@ static SwpState_t NextState(SwpState_t state) {
             if (ctx.isTruncatedLeft || ctx.isTruncatedRight) {
                 return SWP_PEAK_TRUNCATION_HANDLING;
             }
-            if (currentStatus.isNotCentered) {
+            if (!currentStatus.isCentered) {
                 return SWP_PEAK_CENTERING;
             }
             if (currentStatus.isSweepDone) {
