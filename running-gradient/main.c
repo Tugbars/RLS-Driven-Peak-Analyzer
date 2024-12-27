@@ -1,16 +1,19 @@
+#include "peakAnalysis.h"
+#include "sliding_window_analysis.h"
+#include "rls_polynomial_regression.h"
+#include "trend_detection.h"
+#include "statistics.h"
+#include "mqs_def.h"
+
+#include <math.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <float.h>
 #include <stdio.h>
-#include <time.h>
+#include <stdarg.h>
 #include <stdlib.h>
 
-#include "buffer_manager.h"
-#include "mes_buffers.h"
-
-#include "windowed_running_gradient.h"
-#include "running_cubic_gradient.h"
-#include "running_peak_analysis.h"
-#include "running_quadratic_gradient.h"
-#include "rls_analysis_parameters.h"
-#include "sliding_window_analysis.h"
 
 void myCallbackFunction(void) {
     if (boundaryErrorOccurred) {
@@ -29,12 +32,13 @@ void PrepareBaseSweep(MesSweep_t *const sweep, MqsRawDataSet_t *const data)
 }
 
 int main() {
-
+    
     PrepareBaseSweep(&rawBaseSweep, rawData); 
     currentRawSweep = &rawBaseSweep;
     
-    int start_index = 210;
+    int start_index = 50;
     startSlidingWindowAnalysis(currentRawSweep, start_index, myCallbackFunction); 
-    
-	return 0;
+   
+    return 0;
 }
+

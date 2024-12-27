@@ -10,8 +10,8 @@
 #define BUFFER_MANAGER_H
 
 #include <stdint.h>
+#include "trend_detection.h"
 #include "mqs_def.h"  // Assuming this contains the definition for MqsRawDataPoint_t
-#include "running_quadratic_gradient.h"  // For QuadraticPeakAnalysisResult
 
 //#define BUFFER_DEBUG
 

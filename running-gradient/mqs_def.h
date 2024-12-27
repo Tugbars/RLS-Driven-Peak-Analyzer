@@ -1,8 +1,6 @@
 #ifndef MQS_DEF_H
 #define MQS_DEF_H
 
-// Define the window size for the linear RLS
-#define WINDOW_SIZE 30
 /** @brief Define a constant for the RLS window size. */
 #define RLS_WINDOW 30
 // Define the window size for the cubic RLS

@@ -8,11 +8,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include "running_quadratic_gradient.h"
-#include "rls_analysis_parameters.h"
 
 #include "buffer_manager.h"
-#include "windowed_running_gradient.h"
 #include "sliding_window_analysis.h"
 
 // Global variables

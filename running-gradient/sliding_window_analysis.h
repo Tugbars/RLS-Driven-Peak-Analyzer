@@ -21,12 +21,9 @@
 #include <stdbool.h>
 
 // Dependencies
-#include "windowed_running_gradient.h"
-#include "running_quadratic_gradient.h"
-#include "running_peak_analysis.h"
-#include "running_cubic_gradient.h"
-#include "rls_analysis_parameters.h"
+#include "peakAnalysis.h"
 #include "buffer_manager.h"
+#include "trend_detection.h"
 #include "mes_buffers.h"
 
 /**

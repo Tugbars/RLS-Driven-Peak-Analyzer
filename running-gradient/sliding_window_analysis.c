@@ -310,7 +310,7 @@ static void initBufferManager(MqsRawDataPoint_t* dataBuffer, int start_index) {
     // 0               -> Starting index in the phaseAngles array (this could be any index where you want to start the analysis)
     // 11300.0         -> Starting frequency for the frequency sweep (in Hz, e.g., starting at 11300 Hz)
     // 1.0             -> Frequency increment per step (in Hz, e.g., increment by 1 Hz for each data point)                                                                                                               
-    init_buffer_manager(dataBuffer, MQS_SWEEP_MAX_NUMBER_OF_SAMPLES, WINDOW_SIZE, start_index, 11300.0, 1.5);                                                    
+    init_buffer_manager(dataBuffer, MQS_SWEEP_MAX_NUMBER_OF_SAMPLES, RLS_WINDOW, start_index, 11300.0, 1.5);                                                    
 
     // Debugging: Print initialization state
     //printf("[DEBUG] Buffer Manager initialized:\n");
@@ -336,52 +336,7 @@ void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t c
     // Initialize the buffer manager
     initBufferManager(sweep->data, start_index);
     
-    	// detect_significant_gradient_trends, determine_trend_direction
-	init_cubic_rls_analysis_parameters(                                                                                                      
-        12.0,   // significance_thresh: Threshold for determining significant cubic trends.                                                     
-               // Trends with a sum of gradients above this threshold are considered significant.
-        5,     // duration_thresh: Minimum number of consecutive points required for a trend to be considered significant.                     
-               // Ensures that only sustained trends are analyzed.
-        2,     // min_trend_count: Minimum number of consistent trends required for cubic analysis.
-               // Helps filter out noise and minor fluctuations.
-        2,     // max_third_order_trend_decrease_count: Maximum number of consecutive decreases allowed in a cubic trend while tracking an increasing trend.            
-               // Allows for minor fluctuations without discarding a potentially valid trend.
-        2      // max_third_order_trend_increase_count: Maximum number of consecutive increases allowed in a cubic trend while tracking a decreasing trend. 
-               // Helps to filter out noise when identifying a cubic trend.
-    );
-    
-    // Initialize the quadratic RLS analysis parameters with the necessary thresholds.                                                          
-    init_quadratic_rls_analysis_parameters(
-        1.0,  // centered_gradient_sum: If the total second-order gradient sum is less than or equal to this value,
-              // the peak is considered centered based on the gradient analysis.
-        1,    // max_decrease_count: Maximum number of consecutive negative gradients allowed
-              // when tracking an increasing trend. Allows for minor fluctuations without discarding a valid trend.
-        1,    // max_increase_count: Maximum number of consecutive positive gradients allowed
-              // when tracking a decreasing trend. Helps to filter out noise when identifying a decreasing trend.
-        5,    // min_trend_count: Minimum number of consistent trends required to consider a peak valid.
-              // Ensures that only sustained trends are analyzed.
-        1     // allowable_inconsistency_count: Allowable number of inconsistencies in trend detection.
-              // Permits minor deviations without discarding the trend.
-    );
-    
-    // Initialize the on-peak analysis parameters for average gradient thresholds and consistent trend count
-   // // INCREASELERIN BŞALADIKLARI YERDEN YAP BUNU?!
-    init_on_peak_analysis_parameters( 
-        0.8,  // min_avg_increase: Minimum average increase required to consider a significant increasing trend gradient per data point. LEFT SIDE OF THE PEAK            
-               // Ensures that only trends with substantial average gradient are flagged as significant.
-        -0.19, // min_avg_decrease: Minimum average decrease required to consider a significant decreasing trend. RIGHT SIDE OF THE PEAK          
-               // Ensures that only trends with substantial average gradient are flagged as significant.
-        5      // min_consistent_trend_count: Minimum number of consecutive data points required for a trend to be considered consistent. 
-               // Helps ensure that only sustained trends are analyzed.
-    );
-    
-    // Initialize gradient analysis parameters
-    init_gradient_analysis_params(
-        0.1,  // gradient_thresh: Threshold for determining a significant gradient increase.                                                    //COMPARE GRADIENT PARTSIN UYESI. SADECE BUYUK GRADIENT ARTIŞLARINI SAYIYOR. 
-        0.6   // min_gradient_total: Minimum total gradient to flag a significant trend.                                                        //BUNUN ALTINDAKİLERE UNDECIDED DİYORUZ. 
-    );
-    
-        // Enable sweep request
+    // Enable sweep request
     currentStatus.isSweepRequested = 1;  // Start sweep request
 
     // Set the initial state to waiting
@@ -413,6 +368,22 @@ static void OnEntryInitialAnalysis(void) {
     concludeSweepState();
 }
 
+
+/**
+ * @brief Prints the details of a PeakAnalysisResult struct.
+ *
+ * @param result The PeakAnalysisResult structure to print.
+ */
+static void printPeakAnalysisResult(const PeakAnalysisResult *result) {
+    printf("=== Peak Analysis Result ===\n");
+    printf("isOnPeak: %s\n", result->isOnPeak ? "true" : "false");
+    printf("isSignificantPeak: %s\n", result->isSignificantPeak ? "true" : "false");
+    printf("isWindowCentered: %s\n", result->isWindowCentered ? "true" : "false");
+    printf("isValidPeak: %s\n", result->isValidPeak ? "true" : "false");
+    
+    printf("============================\n");
+}
+
 /**
  * @brief Entry function for the SWP_SEGMENT_ANALYSIS state.
  *
@@ -421,28 +392,44 @@ static void OnEntryInitialAnalysis(void) {
  * the `SWP_WAITING` state to prevent infinite looping.
  */
 static void OnEntrySegmentAnalysis(void) {
-    float forgetting_factor = 0.5f;
+    
+    uint8_t degree = 3;             // Degree for RLS regression
+    GradientOrder gradientOrder = GRADIENT_ORDER_FIRST;  // Change as needed
 
-    // Perform segment trend and concavity analysis
-    SegmentAnalysisResult result = segment_trend_and_concavity_analysis(
+    printf("=== Performing Peak Analysis ===\n");
+    PeakAnalysisResult peakResult = performPeakAnalysis(
         buffer_manager.buffer,
+        RLS_WINDOW, //not necessary
         buffer_manager.current_buffer_index,
         buffer_manager.window_size,
-        forgetting_factor
+        degree,
+        gradientOrder
     );
-
+    
+    //printPeakAnalysisResult(&peakResult);
+    
+    // peakResult.isCenteringNeeded, OnPeak utilize edilmiyor sorun o.
+    if(peakResult.isSignificantPeak)
+    { 
+    currentStatus.isPeakFound = 1; 
+    }
+    
     // Update the context with the direction result
-    ctx.direction = result.nextDirection;
-
+    ctx.direction = peakResult.moveDirection;
+    
     // Update the shift tracker with the new direction
     update_shift_tracker(ctx.direction);
-
+    
+    //saçma bir şekilde undecided'a giriyor. 
+  
     // Check if we are on the peak
-    if (ctx.direction == ON_PEAK) {
-        currentStatus.isPeakFound = 1;
+    if (ctx.direction == ON_THE_PEAK) {  //SORUN. 
+        
     } else if (ctx.direction == UNDECIDED || ctx.direction == NEGATIVE_UNDECIDED) {
         currentStatus.isUndecided = 1;  // Raise undecided flag for both cases
     }
+    
+    
 
     // Mark this state as complete and proceed to the next state
     STATE_FUNCS[SWP_SEGMENT_ANALYSIS].isComplete = true;
@@ -498,142 +485,6 @@ static void OnEntryUndecidedTrendCase(void) {
 
 
 /**
- * @brief Adjusts the global forgetting factor based on gradient sums to improve peak centering.
- *
- * This function calculates the total second-order gradient sum within the buffer window and 
- * adjusts the global centering forgetting factor to better center the peak. It first checks 
- * whether increasing or decreasing the forgetting factor results in a more favorable gradient 
- * sum. The function then modifies the forgetting factor iteratively to emphasize newer or 
- * older data points, improving the accuracy of the peak centering process.
- *
- * ### Parameters:
- * @param buffer Pointer to the data buffer containing the phase angle values.
- * @param buffer_size Size of the data buffer.
- * @param start_index Starting index in the buffer for the gradient calculation.
- * @param previous_gradient_sum Pointer to the previous total gradient sum for comparison.
- * @param centering_attempts Current number of centering attempts.
- *
- * @return double The updated global forgetting factor after the adjustment.
- *
- * ### Intention:
- * - The goal of this function is to adjust the forgetting factor used during peak centering
- *   to achieve better alignment of the data window with the actual peak in the signal.
- * - It does this by comparing the total sum of second-order gradients (a measure of the curvature
- *   of the data) across different forgetting factor values.
- * - If increasing or decreasing the forgetting factor improves the total gradient sum (indicating 
- *   better symmetry around the peak), the function adjusts the global forgetting factor accordingly.
- * - The function is designed to handle both symmetric and asymmetric peaks, refining the 
- *   centering process over multiple attempts.
- *
- * ### Handling Peak Asymmetry:
- * - In real-world signals, peaks can often be **asymmetric** due to noise or inherent system behavior.
- * - **Increasing** the forgetting factor helps correct asymmetry by giving more weight to recent data points.
- * - **Decreasing** the forgetting factor allows the algorithm to smooth the influence of newer points
- *   and gives more emphasis to older data, which helps when the peak asymmetry lies in earlier data.
- * - The function dynamically adjusts the forgetting factor to **adapt** to the specific peak characteristics
- *   and asymmetries, refining the centering process until the second-order gradients are minimized.
- * 
- * - The iterative adjustment helps ensure that the peak is centered by minimizing the total sum 
- *   of the second-order gradients, effectively handling any peak asymmetry.
- */
-double adjust_forgetting_factor(const MqsRawDataPoint_t* buffer, uint16_t buffer_size, uint16_t start_index, 
-                                double* previous_gradient_sum, 
-                                uint8_t centering_attempts) 
-{
-    // Get the total gradient sum with the global centering_forgetting_factor
-    double total_gradient_sum = compute_total_second_order_gradient(buffer, buffer_size, start_index, centering_forgetting_factor);
-
-    // Check if this is the first centering attempt
-    if (*previous_gradient_sum == -1.0) { 
-        
-        // First attempt, no comparison to previous value
-        *previous_gradient_sum = total_gradient_sum;
-        
-    } else if (centering_attempts == 1) {
-        // Second attempt, try both increasing and decreasing the forgetting factor
-
-        // Store the current total_gradient_sum and forgetting factor
-        double increased_forgetting_factor = centering_forgetting_factor + FORGETTING_FACTOR_ADJUSTMENT;
-        double decreased_forgetting_factor = centering_forgetting_factor - FORGETTING_FACTOR_ADJUSTMENT;
-
-        // Compute the total gradient sum for increased forgetting factor
-        double increased_gradient_sum = compute_total_second_order_gradient(
-            buffer, buffer_size, start_index, increased_forgetting_factor
-        );
-
-        // Compute the total gradient sum for decreased forgetting factor
-        double decreased_gradient_sum = compute_total_second_order_gradient(
-            buffer, buffer_size, start_index, decreased_forgetting_factor
-        );
-
-        // Compare which one is better
-        if (fabs(increased_gradient_sum) < fabs(*previous_gradient_sum)) {
-            // Use increased forgetting factor if it's better
-            centering_forgetting_factor = increased_forgetting_factor;
-            total_gradient_sum = increased_gradient_sum;
-            printf("Increased forgetting factor improved centering: %.2f\n", centering_forgetting_factor);
-        } else if (fabs(decreased_gradient_sum) < fabs(*previous_gradient_sum)) {
-            // Use decreased forgetting factor if it's better
-            centering_forgetting_factor = decreased_forgetting_factor;
-            total_gradient_sum = decreased_gradient_sum;
-            printf("Decreased forgetting factor improved centering: %.2f\n", centering_forgetting_factor);
-        } else {
-            // If neither is better, stick with the current one
-            printf("Neither increased nor decreased forgetting factor improved centering, keeping it: %.2f\n", centering_forgetting_factor);
-        }
-        
-    } else {
-        // For subsequent attempts, compare the current and previous gradient sums
-        if (fabs(total_gradient_sum) > fabs(*previous_gradient_sum)) {
-            // If the new gradient sum is worse, decrease the forgetting factor
-            centering_forgetting_factor -= FORGETTING_FACTOR_ADJUSTMENT;
-            
-            if (centering_forgetting_factor < 0.1) {
-                // Ensure the factor does not go below a certain minimum (e.g., 0.1)
-                centering_forgetting_factor = 0.1;
-            }
-            
-            printf("Centering worsened, reducing forgetting factor to: %.2f\n", centering_forgetting_factor);
-        } else {
-            // If the new gradient sum is better, increase the forgetting factor
-            centering_forgetting_factor += FORGETTING_FACTOR_ADJUSTMENT;
-            printf("Centering improved, increasing forgetting factor to: %.2f\n", centering_forgetting_factor);
-        }
-    }
-
-    // Update the previous gradient sum with the current one for the next comparison
-    *previous_gradient_sum = total_gradient_sum;
-
-    return centering_forgetting_factor;  // Return the updated forgetting factor
-}
-
-
-/**
- * @brief Checks if the peak is centered based on the total gradient sum.
- *
- * This function compares the total sum of second-order gradients with the predefined
- * threshold values (`centered_gradient_sum`). If the total gradient sum is within
- * the acceptable range, the peak is considered centered.
- *
- * @param total_gradient_sum The total sum of second-order gradients over the data window.
- * @return true if the peak is centered, false otherwise.
- */
-static bool check_centering_status(double total_gradient_sum) {
-    // Check if the total gradient sum falls within the acceptable range
-    if (total_gradient_sum <= quadratic_analysis_params.centered_gradient_sum &&
-        total_gradient_sum >= -quadratic_analysis_params.centered_gradient_sum) {
-        
-        // The peak is considered centered
-        currentStatus.isCentered = 1;
-        printf("Peak is centered based on total_gradient_sum.\n");
-        STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-        return true;
-    }
-    return false;
-}
-
-
-/**
  * @brief Resets state completion flags and checks if the maximum centering attempts have been exceeded.
  *
  * This function resets the necessary flags for the peak centering state to ensure that
@@ -664,157 +515,6 @@ static void reset_centering_flags(void) {
         STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
         SwpProcessStateChange();
     }
-}
-
-
-/**
- * @brief Performs the peak centering logic by computing the second-order gradient and adjusting the forgetting factor.
- *
- * This function calculates the total sum of second-order gradients within the current buffer,
- * which is used to analyze the curvature of the data and determine if adjustments are needed to center the peak.
- * It also adjusts the global forgetting factor to adapt to changing data characteristics.
- *
- * ### Steps:
- * 1. Calls `compute_total_second_order_gradient` to calculate the total gradient sum over the current data window.
- *    - The second-order gradient indicates how the signal is curving and helps in centering the peak.
- * 2. Calls `adjust_forgetting_factor` to update the global forgetting factor based on the calculated gradient sum.
- * 3. Increments the `centering_attempts` counter to track how many centering attempts have been made.
- *
- * @param previous_gradient_sum The previous sum of the gradient used to adjust the forgetting factor.
- * 
- * @note
- * - The global forgetting factor controls how much weight is given to past data vs. new data in the centering process.
- * - The second-order gradient measures the curvature of the signal, which helps in determining if the peak is centered.
- *
- * @see compute_total_second_order_gradient
- * @see adjust_forgetting_factor
- */
-static void perform_peak_centering_logic(void) {
-    // Static variable to store the previous gradient sum across function calls
-    static double previous_gradient_sum = -1.0;
-
-    // Perform the peak centering logic
-    double total_gradient_sum = compute_total_second_order_gradient(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,
-        centering_forgetting_factor // Use the updated global forgetting factor
-    );
-
-    // Adjust the global forgetting factor based on the total gradient sum
-    adjust_forgetting_factor(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,
-        &previous_gradient_sum, // Pass the static previous_gradient_sum
-        centering_attempts
-    );
-
-    // Increment the centering attempts counter
-    centering_attempts++;
-}
-
-
-/**
- * @brief Handles invalid trend data during the centering process.
- *
- * If the gradient trends for increasing or decreasing data are found to be invalid,
- * this function marks the peak as centered to prevent infinite loops and concludes the sweep.
- *
- * ### Steps:
- * 1. Checks if the increasing or decreasing trends from `track_gradient_trends_with_quadratic_regression` are invalid.
- *    - If either trend is invalid, the peak is considered centered to avoid an infinite loop.
- * 2. Marks the state as complete and calls `concludeSweepState` to finalize the sweep.
- *
- * @param gradient_trends Pointer to the structure containing information about the gradient trends.
- * @return `true` if the trend data is invalid and the peak is considered centered, `false` otherwise.
- *
- * @note
- * - This function is a safeguard to prevent the system from getting stuck in an infinite centering loop when the trend data is unreliable.
- *
- * @see concludeSweepState
- */
-static bool handle_invalid_trend_data(GradientTrendResult* gradient_trends) {
-    if (!gradient_trends->increase_info.valid || !gradient_trends->decrease_info.valid) {
-        printf("Invalid trend data. Cannot proceed with centering.\n");
-        currentStatus.isCentered = 1;  // Prevent infinite loops by considering the peak centered
-        STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-        concludeSweepState();
-        return true;
-    }
-    return false;
-}
-
-
-/**
- * @brief Adjusts the data window position based on the duration of increasing and decreasing trends.
- *
- * This function compares the durations of the increasing and decreasing trends to determine
- * if the data window needs to be shifted to center the peak. If the increasing duration is longer,
- * the window is shifted right, and if the decreasing duration is longer, the window is shifted left.
- *
- * ### Steps:
- * 1. Calculates the durations of the increasing and decreasing trends.
- * 2. Compares the durations to determine whether the peak is left- or right-shifted.
- * 3. Shifts the data window by calling `move_window_and_update_if_needed` to center the peak.
- *
- * @param gradient_trends Pointer to the structure containing trend information.
- *
- * @note
- * - The shift amount is calculated as the difference between the increasing and decreasing trend durations, divided by 2.
- * - Shifts are applied to center the peak within the data window.
- *
- * @see move_window_and_update_if_needed
- */
-static void adjust_window_position(GradientTrendResult* gradient_trends) {
-    uint16_t increase_duration = (gradient_trends->increase_info.end_index + buffer_manager.buffer_size 
-                                  - gradient_trends->increase_info.start_index) % buffer_manager.buffer_size;
-    uint16_t decrease_duration = (gradient_trends->decrease_info.end_index + buffer_manager.buffer_size 
-                                  - gradient_trends->decrease_info.start_index) % buffer_manager.buffer_size;
-
-    int shift_amount = 0;
-    int direction = UNDECIDED;
-
-    if (increase_duration > decrease_duration) {
-        shift_amount = (increase_duration - decrease_duration) / CENTERING_RATIO;
-        direction = RIGHT_SIDE;
-        printf("Increase duration (%u) > decrease duration (%u). Moving right by %d.\n", increase_duration, decrease_duration, shift_amount);
-    } else if (decrease_duration > increase_duration) {
-        shift_amount = (decrease_duration - increase_duration) / CENTERING_RATIO;
-        direction = LEFT_SIDE;
-        printf("Decrease duration (%u) > increase duration (%u). Moving left by %d.\n", decrease_duration, increase_duration, shift_amount);
-    } else {
-        currentStatus.isCentered = 1;
-        printf("Increase and decrease durations are equal. Peak is centered.\n");
-        STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-    }
-
-    if (shift_amount != 0) {
-        move_window_and_update_if_needed(direction, shift_amount);
-    }
-}
-
-
-/**
- * @brief Finalizes the current centering attempt by marking the peak as centered and concluding the state.
- *
- * This function concludes the current centering attempt by marking the state as complete
- * and calling `concludeSweepState` to finalize any remaining tasks.
- *
- * ### Steps:
- * 1. Marks the peak as centered by setting `currentStatus.isCentered` to `1`.
- * 2. Marks the state as complete and calls `concludeSweepState` to finalize the sweep.
- *
- * @note
- * - This function is called after adjusting the data window to either finalize the centering
- *   or recheck if further adjustments are needed.
- *
- * @see concludeSweepState
- */
-static void finalize_centering_attempt(void) {
-    currentStatus.isCentered = 1;
-    STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-    concludeSweepState();  // Finalize buffer updates if needed
 }
 
 
@@ -850,93 +550,68 @@ static void finalize_centering_attempt(void) {
  * @see finalize_centering_attempt
  */
 static void OnEntryPeakCentering(void) {
-    static double previous_gradient_sum = -1.0;
-
     // Reset flags and check if centering attempts exceeded
     reset_centering_flags();
-    if (STATE_FUNCS[SWP_PEAK_CENTERING].isComplete) return;
+    if (STATE_FUNCS[SWP_PEAK_CENTERING].isComplete) return; //where doe sthis come from?
+    
+    
+     uint8_t degree = 3;             // Degree for RLS regression
+     printf("\n=== Centering ===\n");
+        // Call identifyAndCalculateCentering to get centering parameters
+        PeakCenteringResult centeringResult = identifyAndCalculateCentering(
+            buffer_manager.buffer,
+            buffer_manager.current_buffer_index,
+            buffer_manager.buffer_size,
+            degree
+        );
+        // Handle invalid trend data
+    //if (handle_invalid_trend_data(&gradient_trends)) return;
+    
+    if(!centeringResult.isCentered){
+            move_window_and_update_if_needed(centeringResult.moveDirection,  centeringResult.moveAmount);
+            //case SWP_PEAK_FINDING_ANALYSIS: will determine if this is really centered or not, after this function.
+    }
+    
+    currentStatus.isCentered = 1;
+    STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
+    concludeSweepState();  // Finalize buffer updates if needed
+}
 
-    // Perform peak centering logic
-    perform_peak_centering_logic();
-
-    // Check if peak is centered based on the gradient sum
-    double total_gradient_sum = compute_total_second_order_gradient(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,
-        centering_forgetting_factor
-    );
-    if (check_centering_status(total_gradient_sum)) {
-        SwpProcessStateChange(); // Proceed to the next state
+/**
+ * @brief Handles and logs warnings based on peak truncation flags.
+ *
+ * This function evaluates the truncation flags in the given `QuadraticPeakAnalysisResult` structure 
+ * and logs warnings about left or right truncation. Additionally, it updates a provided context 
+ * structure (e.g., `ctx`) with truncation information if necessary.
+ *
+ * @param result Pointer to the `QuadraticPeakAnalysisResult` containing verification results.
+ * @param ctx    Pointer to a user-defined context structure to store truncation state (optional).
+ */
+void handle_truncation_warnings(const QuadraticPeakAnalysisResult *result, SlidingWindowAnalysisContext *ctx) {
+    if (!result) {
+        printf("Invalid result pointer provided to handle_truncation_warnings.\n");
         return;
     }
 
-    // Analyze trends with quadratic regression
-    GradientTrendResult gradient_trends = track_gradient_trends_with_quadratic_regression(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,
-        buffer_manager.window_size,
-        centering_forgetting_factor
-    );
-
-    // Handle invalid trend data
-    if (handle_invalid_trend_data(&gradient_trends)) return;
-
-    // Adjust window position if peak is not centered
-    adjust_window_position(&gradient_trends);
-    finalize_centering_attempt(); // Finalize attempt
-}
-
-
-/**
- * @brief Verifies if the peak is centered based on the total sum of second-order gradients.
- *
- * This function checks if the total sum of second-order gradients falls within the acceptable range
- * defined by `centered_gradient_sum`. If the sum is outside the range, it indicates that the peak is
- * not centered, and the state machine will return to the peak-centering state.
- *
- * ### Key Operations:
- * - Compares the total gradient sum to the defined threshold.
- * - If the peak is not centered, it sets the `currentStatus.isNotCentered` flag to indicate this.
- *
- * @param total_gradient_sum The sum of second-order gradients to evaluate.
- * @see quadratic_analysis_params
- */
-static void verify_peak_centering(double total_gradient_sum) {
-    if (total_gradient_sum > quadratic_analysis_params.centered_gradient_sum || 
-        total_gradient_sum < -quadratic_analysis_params.centered_gradient_sum) {
-        // Peak is not centered yet, flag it and return to peak centering
-        printf("Peak not centered, returning to peak centering state.\n");
-        currentStatus.isNotCentered = 1;  // Set flag to indicate it's not centered
+    // Handle left truncation warning
+    if (result->is_truncated_left) {
+        printf("Warning: Peak verification truncated on the left side.\n");
+        if (ctx) {
+            ctx->isTruncatedLeft = true;  // Update context if provided
+        }
     }
-}
 
-/**
- * @brief Prints truncation warnings if peak verification was truncated.
- *
- * This function checks the `QuadraticPeakAnalysisResult` for truncation flags and prints
- * messages indicating whether truncation occurred on the left, right, or both sides of the
- * data window during peak verification.
- *
- * ### Key Operations:
- * - Checks for truncation flags (`is_truncated_left` and `is_truncated_right`).
- * - Logs truncation messages if applicable.
- *
- * @param result Pointer to the `QuadraticPeakAnalysisResult` containing truncation flags.
- * @see QuadraticPeakAnalysisResult
- */
-static void print_truncation_warnings(QuadraticPeakAnalysisResult* result) {
-    // Handle truncation flags if the verification was truncated
-    if (result->is_truncated_left || result->is_truncated_right) {
-        if (result->is_truncated_left) {
-            printf("Peak verification truncated on the left side.\n");
-            ctx.isTruncatedLeft = true;
+    // Handle right truncation warning
+    if (result->is_truncated_right) {
+        printf("Warning: Peak verification truncated on the right side.\n");
+        if (ctx) {
+            ctx->isTruncatedRight = true;  // Update context if provided
         }
-        if (result->is_truncated_right) {
-            printf("Peak verification truncated on the right side.\n");
-            ctx.isTruncatedRight = true;
-        }
+    }
+
+    // If no truncations occurred
+    if (!result->is_truncated_left && !result->is_truncated_right) {
+        printf("No truncation detected in peak verification.\n");
     }
 }
 
@@ -944,36 +619,70 @@ static void print_truncation_warnings(QuadraticPeakAnalysisResult* result) {
 /**
  * @brief Processes the result of peak verification and determines if the peak is valid.
  *
- * This function checks the outcome of the peak verification process. If the peak is successfully
- * verified, it resets relevant counters, prints the analysis interval, and marks the sweep as complete.
- * If the peak is not verified, the function flags that the peak is not centered, prompting the state
- * machine to return to the peak-centering process.
+ * This function evaluates the result of a peak verification process. It resets relevant counters,
+ * updates the status flags, and marks the sweep as complete if the peak is valid. If the peak
+ * verification fails, the function flags that the peak is not centered and prompts a return to
+ * the peak-centering process.
  *
  * ### Key Operations:
- * - Resets centering attempts and forgetting factor upon successful peak verification.
+ * - Resets centering attempts upon successful peak verification.
  * - Marks the sweep as complete if the peak is valid.
  * - Flags the peak as not centered if verification fails.
+ * - Logs detailed messages for success or failure scenarios.
+ *
+ * @param result Pointer to the `QuadraticPeakAnalysisResult` containing verification results.
+ * @param centering_attempts Pointer to the centering attempts counter to reset if successful.
+ * @return `true` if the peak was successfully verified, `false` otherwise.
+ * @see QuadraticPeakAnalysisResult
+ */
+/**
+ * @brief Processes the result of peak verification and determines if the peak is valid.
+ *
+ * This function evaluates the result of a peak verification process. It resets relevant counters,
+ * updates the status flags, and marks the sweep as complete if the peak is valid. If the peak
+ * verification fails, the function flags that the peak is not centered and prompts a return to
+ * the peak-centering process.
+ *
+ * ### Key Operations:
+ * - Resets centering attempts upon successful peak verification.
+ * - Marks the sweep as complete if the peak is valid.
+ * - Flags the peak as not centered if verification fails.
+ * - Logs detailed messages for success or failure scenarios.
  *
  * @param result Pointer to the `QuadraticPeakAnalysisResult` containing verification results.
  * @return `true` if the peak was successfully verified, `false` otherwise.
  * @see QuadraticPeakAnalysisResult
- * @see print_analysis_interval
  */
-static bool process_peak_verification(QuadraticPeakAnalysisResult* result) {
+bool process_peak_verification(
+    const QuadraticPeakAnalysisResult *result
+) {
+    if (!result) {
+        printf("Error: Null pointer passed to process_peak_verification.\n");
+        return false;
+    }
+
+    // If peak verification succeeded
     if (result->peak_found) {
-        printf("Peak verification successful, peak is centered.\n");
-        centering_attempts = 0;               // Reset the centering attempts counter
-        centering_forgetting_factor = 0.7;    // Reset the forgetting factor
-        print_analysis_interval();            // Print the buffer interval    
-        currentStatus.isSweepDone = 1;        // Mark the sweep as done
+        printf("[Success] Peak verification successful. Peak is centered at index %u.\n", result->peak_index);
+
+        // Reset counters and mark sweep as done
+        centering_attempts = 0;                  // Reset the centering attempts counter
+        currentStatus.isSweepDone = 1;           // Mark the sweep as done
+        currentStatus.isNotCentered = 0;         // Clear the not-centered flag
+        currentStatus.isVerificationFailed = 0;   // Clear the verification failed flag
+
         return true;
     } else {
-        printf("Peak verification failed, returning to peak centering.\n");
-        currentStatus.isNotCentered = 1;  // Set flag to indicate it's not centered
+        // If peak verification failed
+        printf("[Failure] Peak verification failed. Returning to peak centering.\n");
+
+        // Update status flags
+        currentStatus.isNotCentered = 1;         // Set flag to indicate the peak is not centered
+        currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failure
+
         return false;
     }
 }
-
 
 /**
  * @brief Executes the peak verification process using quadratic regression.
@@ -994,19 +703,23 @@ static bool process_peak_verification(QuadraticPeakAnalysisResult* result) {
  */
 static void perform_peak_verification(void) {
     // Perform peak verification through quadratic regression
-    QuadraticPeakAnalysisResult verification_result = find_and_verify_quadratic_peak(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,  // Peak index
-        0.5 // Forgetting factor
+    int degree = 3;
+    
+        QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
+            buffer_manager.buffer,
+            buffer_manager.buffer_size,
+            buffer_manager.current_buffer_index,
+            RLS_WINDOW,  //another problem.
+            degree
     );
 
-    // Print truncation warnings, if any
-    print_truncation_warnings(&verification_result);
+
+    //Print truncation warnings, if any
+    handle_truncation_warnings(&verificationResult, &ctx); // handle_truncation_warnings
 
     // Process peak verification result, if successful or not
-    if (process_peak_verification(&verification_result)) {
-        return; // Peak is centered, no further action needed
+    if (process_peak_verification(&verificationResult)) {  //process_peak_verification
+       return; // Peak is centered, no further action needed
     }
 }
 
@@ -1026,23 +739,33 @@ static void perform_peak_verification(void) {
  * @see perform_peak_verification
  * @see verify_peak_centering
  */
-static void check_peak_centering_and_verify(void) {
+static void check_peak_centering_and_verify(void) { //trackGradients would solve it. 
     // Compute total second-order gradient sum to verify peak
-    double total_gradient_sum = compute_total_second_order_gradient(
-        buffer_manager.buffer,
-        buffer_manager.buffer_size,
-        buffer_manager.current_buffer_index,
-        0.5 // Forgetting factor
-    );
+    
+    // Initialize result structure
+    GradientCalculationResult result;
 
-    printf("Total sum of second-order gradients during peak verification: %.6f\n", total_gradient_sum);
-
-    // Check if peak is centered, otherwise proceed to verification
-    verify_peak_centering(total_gradient_sum);
-    if (currentStatus.isNotCentered == 0) {
+    // Define minimum ratio (e.g., 0.3 for 30%)
+    double min_ratio = 0.3;
+    
+    bool isCentered = peakAnalysis_checkPeakCentering(  // daha dikkat etmek gerekiyor buna. 
+    buffer_manager.buffer,
+    buffer_manager.buffer_size,
+    buffer_manager.current_buffer_index,
+    min_ratio,
+    &result
+   );
+   
+   if (isCentered) {
+        printf("Valid negative trend with adequate peak capture detected.\n");
+        printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
+        currentStatus.isNotCentered = 0;
         perform_peak_verification();
+    } else {
+        printf("Negative trend not found or peak not adequately captured.\n");
+        currentStatus.isNotCentered = 1;
     }
-}
+} 
 
 
 /**
@@ -1111,7 +834,7 @@ static void OnEntryPeakFindingAnalysis(void) {
  * 2. **Left Side Truncation Handling**:
  *    - Checks if the peak verification was truncated on the left side (`ctx.isTruncatedLeft`).
  *    - If so, it moves the data window to the left by a predefined amount (e.g., 5 positions)
- *      using `move_window_and_update_if_needed`.
+ *      using `move_window_and_update_if_needed`.BI
  *    - Re-verifies the peak at the current buffer index by calling `verify_peak_at_index`.
  *    - Resets the `isTruncatedLeft` flag in the context.
  * 3. **Right Side Truncation Handling**:
@@ -1226,10 +949,20 @@ static void OnExitPeakCentering(void) {
  */
 static void OnExitPeakTruncationHandling(void) {
     // Verify if the peak was successfully centered after truncation
-    bool peak_verified_after_truncation = verify_peak_at_index(buffer_manager.current_buffer_index);
-    if (peak_verified_after_truncation) {
+    
+    // Now call verifyPeakValidity with the new startIndex
+    QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
+            buffer_manager.buffer,
+            buffer_manager.buffer_size,
+            buffer_manager.current_buffer_index,
+            RLS_WINDOW,  //another problem.
+            3 //degree
+    );
+
+    
+    if (verificationResult.peak_found && !verificationResult.is_truncated_left && !verificationResult.is_truncated_right) {
         printf("Peak verification successful after truncation handling, peak is centered.\n");
-        print_analysis_interval();  // Print the buffer interval
+        print_analysis_interval();  // Print the buffer interval, comes from buffer manager. 
         currentStatus.isSweepDone = 1;  // Mark the sweep as done
         // Now the state is ready to transition, mark it complete
 
@@ -1237,7 +970,6 @@ static void OnExitPeakTruncationHandling(void) {
         // If peak is not verified, return to peak finding analysis
         printf("Peak verification failed after truncation handling, returning to peak finding analysis.\n");
         currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failed
-       
     }
     
     STATE_FUNCS[SWP_PEAK_TRUNCATION_HANDLING].isComplete = true;
