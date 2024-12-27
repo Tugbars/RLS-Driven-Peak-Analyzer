@@ -1,17 +1,98 @@
 /**
  * @file rls_polynomial_regression.c
- * @brief Implementation of Recursive Least Squares (RLS) for polynomial regression using QR decomposition.
+ * @brief Recursive Least Squares (RLS) Polynomial Regression with Hybrid QR Decomposition
  *
- * This file contains the implementation of an RLS algorithm for polynomial regression,
- * optimized for numerical stability using QR decomposition with Givens rotations.
- * The implementation incorporates regularization, periodic reorthogonalization,
- * and condition number monitoring.
+ * This file implements a Recursive Least Squares (RLS) algorithm for polynomial regression,
+ * optimized for numerical stability and efficiency by combining **Householder reflections**
+ * with **Givens rotations** in the QR decomposition process.
  *
- * Upgrades implemented:
- * - Incremental QR Decomposition using Givens rotations for efficiency.
- * - Optimized polynomial basis computation using incremental multiplication.
- * - Optimized Householder transformations in recompute_qr_decomposition.
- * - Improved condition number estimation.
+ * ## Overview
+ *
+ * The RLS algorithm updates regression coefficients in real-time as new data points are added
+ * or removed. To maintain computational efficiency and numerical accuracy, this implementation
+ * employs a hybrid QR decomposition approach:
+ *
+ * - **Householder Reflections:** Utilized periodically to reorthogonalize the \( \mathbf{Q} \)
+ *   matrix, correcting any numerical drift that may accumulate over successive updates.
+ *
+ * - **Givens Rotations:** Applied incrementally to add or remove data points, allowing
+ *   localized adjustments to the upper triangular \( \mathbf{R} \) matrix without
+ *   recomputing the entire decomposition.
+ *
+ * ## Mathematical Foundations
+ *
+ * ### Householder Reflections
+ * - **Nature:** Reflect entire columns to zero out sub-diagonal elements in a single transformation.
+ * - **Usage in RLS:** Efficiently reorthogonalizes the \( \mathbf{Q} \) matrix during periodic updates,
+ *   ensuring long-term numerical stability of the regression coefficients.
+ *
+ * ### Givens Rotations
+ * - **Nature:** Rotate specific pairs of rows or columns to zero out targeted elements.
+ * - **Usage in RLS:** Facilitates incremental updates by efficiently adding or removing data points
+ *   through localized transformations, maintaining the upper triangular structure of \( \mathbf{R} \).
+ *
+ * ## Hybrid QR Decomposition Approach
+ *
+ * This RLS implementation synergistically combines Householder reflections and Givens rotations
+ * to optimize the QR decomposition process, balancing computational efficiency with numerical
+ * stability:
+ *
+ * ### Householder Reflections for Reorthogonalization
+ * - **Purpose:** Periodically recompute the entire QR decomposition to correct accumulated numerical
+ *   errors and maintain the orthogonality of the \( \mathbf{Q} \) matrix.
+ * - **Implementation:** After a set number of incremental updates, Householder reflections are applied
+ *   to the current \( \mathbf{Q} \) and \( \mathbf{R} \) matrices to reestablish their orthogonal
+ *   and upper triangular properties, respectively.
+ *
+ * ### Givens Rotations for Incremental Updates
+ * - **Purpose:** Efficiently add or remove data points by applying localized rotations, avoiding the
+ *   computational overhead of recomputing the entire QR decomposition.
+ * - **Implementation:** When a new data point is added, Givens rotations are used to update the
+ *   \( \mathbf{R} \) matrix to incorporate the new information. Similarly, when a data point is
+ *   removed, Givens rotations adjust \( \mathbf{R} \) to reflect the change, ensuring that
+ *   \( \mathbf{Q}\mathbf{R} = \mathbf{A} \) remains valid as \( \mathbf{A} \) evolves.
+ *
+ * ## Comparative Mathematical Nature
+ *
+ * | **Aspect**                    | **Householder Reflections**                            | **Givens Rotations**                                   | **Hybrid Approach in RLS**                             |
+ * |-------------------------------|--------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------|
+ * | **Transformation Type**      | Reflective transformations on entire columns          | Rotational transformations on specific row/column pairs| Combines global reflections with local rotations       |
+ * | **Operation Scope**           | Bulk operations affecting multiple elements simultaneously | Targeted operations affecting specific elements        | Global corrections with localized adjustments          |
+ * | **Efficiency**                | Highly efficient for dense, static matrices            | Highly efficient for sparse or dynamic matrices        | Balances efficiency for both dense and dynamic scenarios|
+ * | **Numerical Stability**       | High stability for batch processing                    | Maintains stability during incremental updates         | Enhanced stability through periodic reorthogonalization |
+ * | **Implementation Complexity** | Simpler for static scenarios                           | More complex due to handling incremental changes        | Increased complexity but optimized for dynamic updates |
+ *
+ * ## Implications of the Hybrid Approach
+ *
+ * 1. **Enhanced Efficiency:**
+ *    - **Incremental Updates:** Givens rotations enable the QR decomposition to be updated incrementally as new data points are added or old ones are removed, without the need to recompute the entire decomposition.
+ *    - **Periodic Reorthogonalization:** Householder reflections periodically reorthogonalize the \( \mathbf{Q} \) matrix, ensuring that numerical errors do not degrade the quality of the decomposition over time.
+ *
+ * 2. **Improved Numerical Stability:**
+ *    - **Combined Strengths:** Givens rotations handle the efficiency of updates, while Householder reflections maintain the numerical accuracy and orthogonality of \( \mathbf{Q} \).
+ *    - **Error Mitigation:** Regular reorthogonalization mitigates the accumulation of floating-point errors, preserving the integrity of the regression model.
+ *
+ * 3. **Flexibility:**
+ *    - **Dynamic Data Handling:** The hybrid approach is well-suited for applications where data is continuously streaming in or being removed, such as online learning systems or real-time data analysis.
+ *    - **Scalability:** Efficiently handles large datasets by minimizing computational overhead through incremental updates.
+ *
+ * @note
+ * - **Regularization Parameter:** The implementation incorporates a regularization parameter to enhance numerical stability.
+ * - **Reorthogonalization Interval:** Determines how frequently Householder reflections are applied to maintain orthogonality.
+ * - **Condition Number Monitoring:** Continuously monitors the condition number to detect and address numerical instability.
+ *
+ * @todo
+ * - Implement additional optimization techniques for even greater efficiency.
+ * - Extend support for higher-degree polynomials and multi-dimensional regression.
+ *
+ * @version
+ * 1.0
+ *
+ * @date
+ * 2024-11-13
+ *
+ * @author
+ * Tugbars Heptaskin
  */
 
 #include "rls_polynomial_regression.h"
