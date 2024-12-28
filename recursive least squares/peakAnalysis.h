@@ -14,6 +14,7 @@
 #include <stdbool.h>
 
 #include "mqs_def.h"
+//#include "mqs/mqs_def.h"
 
 /**
  * @brief Structure to store the results of peak centering calculations.
@@ -44,6 +45,7 @@ typedef struct {
     uint16_t peak_index;        /**< Index of the detected peak in the dataset */
     bool is_truncated_left;     /**< Indicates if the left side of the peak is truncated */
     bool is_truncated_right;    /**< Indicates if the right side of the peak is truncated */
+    uint16_t distance_to_end;   /**< Distance from the peak to the end of the window */
 } QuadraticPeakAnalysisResult;
 
 /**

@@ -6,12 +6,6 @@
  * sliding window analysis on phase angle data collected from an impedance analyzer.
  * The analysis is used to detect trends, peaks, and to adjust the analysis window dynamically.
  *
- * Dependencies:
- * - windowed_running_gradient.h
- * - running_quadratic_gradient.h
- * - running_peak_analysis.h
- * - running_cubic_gradient.h
- * - rls_analysis_parameters.h
  */
 
 #ifndef SLIDING_WINDOW_ANALYSIS_H
@@ -65,8 +59,9 @@ typedef enum {
 typedef struct {
     PeakPosition direction;       /**< Current direction based on peak analysis (LEFT, RIGHT, ON_PEAK, UNDECIDED). */
     Callback_t callback;          /**< Callback function to be invoked during the analysis. */
-    bool isTruncatedLeft;         // New field
-    bool isTruncatedRight;         // New field
+    bool isTruncatedLeft;         /**< Indicates if the left side of the sliding window is truncated. */
+    bool isTruncatedRight;        /**< Indicates if the right side of the sliding window is truncated. */
+    bool isPeakNearBoundary;      /**< Flag to indicate if the peak is near the boundary of the sliding window. */
     const double* phaseAngles;    /**< Pointer to the array of phase angles to be analyzed. */
     uint16_t phase_angle_size;    /**< Size of the phase angles array. */
 } SlidingWindowAnalysisContext;

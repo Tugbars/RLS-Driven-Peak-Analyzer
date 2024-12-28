@@ -1097,7 +1097,7 @@ void trackGradients(
         // (Depending on your existing API for 'add_data_point_to_regression', 
         //  you may need to adapt it to accept a single double instead of an array.)
         add_data_point_to_regression(&regression_state, measurements, current_index);
-        DEBUG_PRINT_3("Added measurement %.6f to RegressionState (index=%u)\n",
+        DEBUG_PRINT_1("Added measurement %.6f to RegressionState (index=%u)\n",
                       measurement, current_index);
 
         // Get the x_value corresponding to the current data point
@@ -1138,5 +1138,4 @@ void trackGradients(
     DEBUG_PRINT_3("Exiting trackGradients\n");
 }
 
-//bir tek bu kaldı. 
 

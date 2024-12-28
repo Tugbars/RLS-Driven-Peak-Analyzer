@@ -122,4 +122,10 @@ void print_analysis_interval(void);
  */
 void AdptSweepAddDataPoint(double real, double imaginary);
 
+
+/**
+ * @brief Checks if a given adjusted buffer index is near the boundaries of the analysis interval.
+ */
+bool isIndexNearBoundary(uint16_t adjustedBufferIndex, uint16_t indexIdentifier);
+
 #endif // BUFFER_MANAGER_H

@@ -429,7 +429,7 @@ QuadraticPeakAnalysisResult verify_quadratic_peak(
     /*************************************************************************
      * Debug
      *************************************************************************/
-    printf("Verifying peak at absolute index %u.\n", result.peak_index);
+    DEBUG_PRINT_1("Verifying peak at absolute index %u.\n", result.peak_index);
 
     /*************************************************************************
      * Left-Side Check: look for consistent POSITIVE gradients.
@@ -482,6 +482,16 @@ QuadraticPeakAnalysisResult verify_quadratic_peak(
     if ((result.peak_index + right_trend_count) >= (start_index + length - 1)) {
         result.is_truncated_right = true;
     }
+    
+     /*************************************************************************
+     * Calculate Distance to End of Window
+     *************************************************************************/
+    uint16_t window_end_index = start_index + length - 1;
+    result.distance_to_end = (result.peak_index <= window_end_index) ? 
+                              (window_end_index - result.peak_index) : 0;
+
+    printf("Distance from verified peak to end of window: %u points\n", result.distance_to_end);
+
 
     /*************************************************************************
      * Final Decision
@@ -565,10 +575,10 @@ QuadraticPeakAnalysisResult verifyPeakValidity(
             );
 
             if (result.peak_found) {
-                printf("Verified peak found at absolute index %u.\n", result.peak_index);
+                DEBUG_PRINT_1("Verified peak found at absolute index %u.\n", result.peak_index);
                 break;  // Stop once we have a verified peak
             } else {
-                printf("Candidate at relative index %u (abs %u) failed verification.\n",
+                DEBUG_PRINT_1("Candidate at relative index %u (abs %u) failed verification.\n",
                        i, (uint16_t)(adjustedStartIndex + i));
             }
         }

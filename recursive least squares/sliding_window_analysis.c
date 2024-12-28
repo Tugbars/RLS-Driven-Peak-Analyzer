@@ -1,5 +1,6 @@
 #include "sliding_window_analysis.h"
 #include "ics.h"
+//#include <hal/ics/ics.h>
 #include <stdio.h>
 
 /**
@@ -15,6 +16,8 @@
 #define CENTERING_RATIO 2
 
 #define PEAK_VERIFICATION_COUNT 5
+
+#define MAX_SAVGOL_WINDOW_SIZE 15
 
 /******************************************************************************/
 /* Global Variables */
@@ -286,6 +289,7 @@ static void adaptiveSweepSampleCb(double real, double imaginary, bool isSweepCom
  * After collecting data, it calls `concludeSweepState` to either continue or finalize the sweep.
  */
 static void startAdaptiveSweep(void) {
+    //set it to 0 before starting a sweep. the sweep count is used in mapping the collected data points with the data buffer.
     currentRawSweep->count = 0;
 
     HalIcsSetStartFreq(buffer_update_info.phase_index_start);
@@ -332,6 +336,7 @@ void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t c
     ctx.callback = callback;
     ctx.isTruncatedLeft = false;
     ctx.isTruncatedRight = false;
+    ctx.isPeakNearBoundary = false;
 
     // Initialize the buffer manager
     initBufferManager(sweep->data, start_index);
@@ -370,21 +375,6 @@ static void OnEntryInitialAnalysis(void) {
 
 
 /**
- * @brief Prints the details of a PeakAnalysisResult struct.
- *
- * @param result The PeakAnalysisResult structure to print.
- */
-static void printPeakAnalysisResult(const PeakAnalysisResult *result) {
-    printf("=== Peak Analysis Result ===\n");
-    printf("isOnPeak: %s\n", result->isOnPeak ? "true" : "false");
-    printf("isSignificantPeak: %s\n", result->isSignificantPeak ? "true" : "false");
-    printf("isWindowCentered: %s\n", result->isWindowCentered ? "true" : "false");
-    printf("isValidPeak: %s\n", result->isValidPeak ? "true" : "false");
-    
-    printf("============================\n");
-}
-
-/**
  * @brief Entry function for the SWP_SEGMENT_ANALYSIS state.
  *
  * This function performs segment analysis on the current window of data to determine the direction of movement.
@@ -396,7 +386,7 @@ static void OnEntrySegmentAnalysis(void) {
     uint8_t degree = 3;             // Degree for RLS regression
     GradientOrder gradientOrder = GRADIENT_ORDER_FIRST;  // Change as needed
 
-    printf("=== Performing Peak Analysis ===\n");
+    //printf("=== Performing Peak Analysis ===\n");
     PeakAnalysisResult peakResult = performPeakAnalysis(
         buffer_manager.buffer,
         RLS_WINDOW, //not necessary
@@ -722,7 +712,7 @@ bool process_peak_verification(
  * @see print_truncation_warnings
  * @see process_peak_verification
  */
-static void perform_peak_verification(void) {
+static uint16_t perform_peak_verification(void) {
     // Perform peak verification through quadratic regression
     int degree = 3;
     
@@ -733,14 +723,18 @@ static void perform_peak_verification(void) {
             RLS_WINDOW,  //another problem.
             degree
     );
-
+    
+    //printf("peak index of the peak: %u\n", verificationResult.peak_index);
 
     //Print truncation warnings, if any
     handle_truncation_warnings(&verificationResult, &ctx); // handle_truncation_warnings
 
     // Process peak verification result, if successful or not
     if (process_peak_verification(&verificationResult)) {  //process_peak_verification
-       return; // Peak is centered, no further action needed
+        bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
+        if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
+    
+       return verificationResult.peak_index; // Peak is centered, no further action needed
     }
 }
 
@@ -781,7 +775,8 @@ static void check_peak_centering_and_verify(void) { //trackGradients would solve
         printf("Valid negative trend with adequate peak capture detected.\n");
         printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
         currentStatus.isCentered = 1;
-        perform_peak_verification();
+        perform_peak_verification(); // should return the index. 
+        print_analysis_interval();
     } else {
         printf("Negative trend not found or peak not adequately captured.\n");
         currentStatus.isCentered = 0;
@@ -888,11 +883,6 @@ static void OnEntryPeakFindingAnalysis(void) {
  * - The function modifies `currentStatus` to communicate the result of the truncation handling to the state machine.
  * - The data window adjustments are crucial for ensuring that the peak is fully captured within the analysis window,
  *   which is essential for accurate peak verification.
- *
- * @see find_and_verify_quadratic_peak
- * @see verify_quadratic_peak
- * @see move_window_and_update_if_needed
- * @see SwpProcessStateChange
  */
 static void OnEntryPeakTruncationHandling(void) {
     // Since this state may involve multiple transitions based on truncation handling, 
@@ -984,6 +974,10 @@ static void OnExitPeakTruncationHandling(void) {
     if (verificationResult.peak_found && !verificationResult.is_truncated_left && !verificationResult.is_truncated_right) {
         printf("Peak verification successful after truncation handling, peak is centered.\n");
         print_analysis_interval();  // Print the buffer interval, comes from buffer manager. 
+        
+        bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
+        if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
+        
         currentStatus.isSweepDone = 1;  // Mark the sweep as done
         // Now the state is ready to transition, mark it complete
 

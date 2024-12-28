@@ -9,11 +9,16 @@
 #include <stdio.h>
 #include <stdint.h>
 
+//#include "plf/trc/trc.h"
+//#include "mes/mes_memory.h"
+
 #include "buffer_manager.h"
 #include "sliding_window_analysis.h"
 
 // Global variables
 BufferUpdateInfo buffer_update_info = {false, 0, 0, 0};
+
+#define PI acosf(-1.0)
 
 BufferManager buffer_manager;
 int analysis_start_index = -1;  // Track the initial start index
@@ -22,6 +27,7 @@ int buffer_shift_offset = 0;  // New global variable to track the shift relative
 
 // Function prototypes
 void AdptSweepAddDataPoint(double real, double imaginary);
+
 
 /**
  * @brief Initializes the BufferManager struct with starting values.
@@ -131,6 +137,47 @@ void AdptSweepAddDataPoint(double real, double imaginary) {
            real, imaginary, buffer_index);
 #endif
 }
+
+/*
+void AdptSweepAddDataPoint(double real, double imaginary) {
+
+    ASSERT(currentRawSweep != NULL);
+    ASSERT(currentRawSweep->count < currentRawSweep->setup->dataCount);
+    ASSERT(real != 0); // Detect divide by zero error
+   
+      // Determine the current buffer index (where the data will be stored)
+    int16_t buffer_index = buffer_update_info.buffer_start_index;
+    
+    const float_t x = (float_t)real;
+    const float_t y = (float_t)imaginary;
+
+    buffer_manager.buffer[buffer_index + currentRawSweep->count].phaseAngle = atanf(y / x) * (180.0f / PI);
+    printf("%f, ",  buffer_manager.buffer[buffer_index].phaseAngle); //sweep->data[sweep->count].phaseAngle);   //, sweep->count);
+
+    const float_t magnitude = sqrtf(powf(x, 2.0f) + powf(y, 2.0f));
+    buffer_manager.buffer[buffer_index + currentRawSweep->count].impedance = 1.0f / (magnitude * MesMemAlgoConfigGet()->impedanceGainFactor);
+
+#ifdef SIMULATION
+    // The real part corresponds to the phaseAngle in our simulation,
+    // but in the real system, this would be computed from the AD5933's real/imaginary output.
+    
+    // Use 'real' (simulated phaseAngle) directly in the buffer
+    //buffer_manager.buffer[buffer_index + currentRawSweep->count].phaseAngle = real;
+
+    // Simulate impedance or calculate from 'imaginary' if necessary
+    //buffer_manager.buffer[buffer_index].impedance = imaginary;  // In real code, this would be calculated
+ #endif   
+    //the data has been collected, increase the count. 
+    currentRawSweep->count++;
+    
+#ifdef BUFFER_DEBUG
+    // Additional debug logging if BUFFER_DEBUG is enabled
+    printf("[AdptSweepAddDataPoint] Detailed debug -> PhaseAngle = %.6f, Impedance = %.6f (buffer index: %d)\n",
+           real, imaginary, buffer_index);
+#endif
+}
+*/
+
 
 /**
  * @brief Updates the buffer to shift the analysis window in a specified direction.
@@ -451,21 +498,13 @@ void move_window_and_update_if_needed(int direction, int move_amount) {
  * separation of concerns, ensuring that the analysis and buffer updates happen in an orderly, non-blocking fashion.
  *
  */
-
-
-/**
- * @brief Prints the values within the tracked interval of phase indices from the beginning to the end.
- *
- * This function will be called once the state machine has finished executing to print the values
- * within the sliding window interval of phase indices from `analysis_start_index` to `analysis_end_index`.
- */
 void print_analysis_interval(void) {
 	if (analysis_start_index == -1 || analysis_end_index == -1) {
 		printf("No analysis interval found.\n");
 		return;
 	}
 
-	printf("\n[RESULT] Sliding Window Analysis Interval:\n");
+	//printf("\n[RESULT] Sliding Window Analysis Interval:\n");
 	printf("Analysis start index: %d, Analysis end index: %d\n", analysis_start_index, analysis_end_index);
 
 	printf("\n[RESULT] Buffer Values in the Interval:\n");
@@ -487,3 +526,46 @@ void print_analysis_interval(void) {
 
 	printf("--------------------------------------\n");
 }
+
+/**
+ * @brief Checks if a given adjusted buffer index is near the boundaries of the analysis interval.
+ *
+ * This function converts the `analysis_start_index` and `analysis_end_index` to adjusted buffer indices
+ * and directly compares the given adjusted buffer index to these converted values to determine proximity.
+ *
+ * @param adjustedBufferIndex The adjusted buffer index to check.
+ * @return bool Returns true if the index is near the boundary, false otherwise.
+ */
+bool isIndexNearBoundary(uint16_t adjustedBufferIndex, uint16_t indexIdentifier) {
+    // Validate that the analysis interval is defined
+    if (analysis_start_index == -1 || analysis_end_index == -1) {
+        printf("Error: Analysis interval not properly initialized.\n");
+        return false;
+    }
+
+    // Convert analysis_start_index and analysis_end_index to adjusted buffer indices
+    int relativeStartPosition = analysis_start_index - buffer_manager.current_phase_index;
+    int adjustedStartIndex = (buffer_manager.current_buffer_index + relativeStartPosition - buffer_shift_offset + buffer_manager.buffer_size) % buffer_manager.buffer_size;
+
+    int relativeEndPosition = analysis_end_index - buffer_manager.current_phase_index;
+    int adjustedEndIndex = (buffer_manager.current_buffer_index + relativeEndPosition - buffer_shift_offset + buffer_manager.buffer_size) % buffer_manager.buffer_size;
+
+    // Debugging: Log the converted start and end indices
+#ifdef BUFFER_DEBUG
+    printf("Analysis Start Index: %d -> Adjusted Start Index: %d\n", analysis_start_index, adjustedStartIndex);
+    printf("Analysis End Index: %d -> Adjusted End Index: %d\n", analysis_end_index, adjustedEndIndex);
+#endif
+
+    // Check if the adjustedBufferIndex is near the start or end adjusted indices
+    if ((adjustedBufferIndex >= adjustedStartIndex && adjustedBufferIndex <= adjustedStartIndex + indexIdentifier) || 
+        (adjustedBufferIndex <= adjustedEndIndex && adjustedBufferIndex >= adjustedEndIndex - indexIdentifier)) {
+        printf("Adjusted Buffer Index %d is near the boundary.\n", adjustedBufferIndex);
+        return true;  // Index is near the boundary
+    }
+
+    // Not near any boundary
+    printf("Adjusted Buffer Index %d is not near the boundary.\n", adjustedBufferIndex);
+    return false;
+}
+
+//analysis start index should be modified to adjusted buffer index first.

@@ -1089,7 +1089,7 @@ void identifyGradientTrends(
     }
 
     // Print or log which gradient order
-    printf("=== Calculating %s Gradients ===\n", gradientOrderStr);
+    DEBUG_PRINT_2("=== Calculating %s Gradients ===\n", gradientOrderStr);
 
     // We call identifyTrends with MqsRawDataPoint_t
     PeakPosition moveDirection = identifyTrends(
@@ -1118,12 +1118,12 @@ void identifyGradientTrends(
                 GradientTrendResultAbsolute *absResult = (GradientTrendResultAbsolute *)trendResult;
                 initializeGradientTrendResultAbsolute(absResult);
                 trendResultBase = &(absResult->base);
-                printf("=== Detecting Absolute %s Gradient Trends ===\n", gradientOrderStr);
+                DEBUG_PRINT_1("=== Detecting Absolute %s Gradient Trends ===\n", gradientOrderStr);
             } else { // TREND_TYPE_SIGNIFICANT
                 GradientTrendResultSignificant *sigResult = (GradientTrendResultSignificant *)trendResult;
                 initializeGradientTrendResultSignificant(sigResult);
                 trendResultBase = &(sigResult->base);
-                printf("=== Detecting Significant %s Gradient Trends ===\n", gradientOrderStr);
+                DEBUG_PRINT_1("=== Detecting Significant %s Gradient Trends ===\n", gradientOrderStr);
             }
 
             // We already have moveDirection from identifyTrends
@@ -1132,14 +1132,14 @@ void identifyGradientTrends(
             // Print results depending on the type
             if (trendType == TREND_TYPE_ABSOLUTE) {
                 GradientTrendResultAbsolute *absResult = (GradientTrendResultAbsolute *)trendResult;
-                printf("Absolute %s Gradient Trends:\n", gradientOrderStr);
-                printf("Move amount: %d\n", absResult->moveAmountAbsolute);
+                DEBUG_PRINT_1("Absolute %s Gradient Trends:\n", gradientOrderStr);
+                DEBUG_PRINT_1("Move amount: %d\n", absResult->moveAmountAbsolute);
                 printTrendDetails("Absolute Increase", &absResult->absoluteIncrease);
                 printTrendDetails("Absolute Decrease", &absResult->absoluteDecrease);
             } else { // TREND_TYPE_SIGNIFICANT
                 GradientTrendResultSignificant *sigResult = (GradientTrendResultSignificant *)trendResult;
-                printf("Significant %s Gradient Trends:\n", gradientOrderStr);
-                printf("Move amount: %d\n", sigResult->moveAmountSignificant);
+                DEBUG_PRINT_1("Significant %s Gradient Trends:\n", gradientOrderStr);
+                DEBUG_PRINT_1("Move amount: %d\n", sigResult->moveAmountSignificant);
                 printTrendDetails("Significant Increase", &sigResult->significantIncrease);
                 printTrendDetails("Significant Decrease", &sigResult->significantDecrease);
             }
@@ -1150,8 +1150,8 @@ void identifyGradientTrends(
             GradientTrendResultAbsolute *gradResult = (GradientTrendResultAbsolute *)trendResult;
             initializeGradientTrendResultAbsolute(gradResult);
 
-            printf("=== Detecting %s Gradient Trends ===\n", gradientOrderStr);
-            printf("Step: Extracting consistent increases and decreases for %s gradients.\n", gradientOrderStr);
+            DEBUG_PRINT_1("=== Detecting %s Gradient Trends ===\n", gradientOrderStr);
+            DEBUG_PRINT_1("Step: Extracting consistent increases and decreases for %s gradients.\n", gradientOrderStr);
 
             // Build absoluteIncrease from gradCalcResultInc
             if (gradCalcResultInc->size > 0) {
