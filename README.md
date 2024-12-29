@@ -1,113 +1,119 @@
-# Running Gradient Calculation
+# Sliding Window Analysis Overview
 
-## Overview
+## **High-Level Overview**
 
-This implementation provides functions to perform running gradient calculations using a recursive least squares algorithm. This method allows for updating regression parameters as new data points are added without the need to reprocess the entire dataset. The primary focus is on maintaining the current state of the regression calculation, including the inverse covariance matrix and the regression coefficients.
+This documentation provides an outline of the **adaptive sliding window approach** used to find and precisely center on a resonant peak in a frequency-domain dataset. Instead of performing one massive sweep over the entire frequency range, the algorithm focuses on a smaller analysis window, which it slides or expands incrementally based on measured gradients (from RLS polynomial regression). By doing so, the program adaptively homes in on the likely peak region and verifies if the peak is genuinely centered.
 
-## Why Use Recursive Least Squares (RLS)?
+### **Key Elements**
+- **Recursive Least Squares (RLS) polynomial regression** to smooth out noise and obtain robust gradients (first- and second-order).
+- **Gradient-based decisions** about whether the window indicates an upward slope, a downward slope, or a peak region.
+- A **state machine** that orchestrates window movement, peak centering, and final validation.
 
-Recursive Least Squares (RLS) is a powerful method used for online parameter estimation in linear regression. Unlike the ordinary least squares (OLS) method, which requires the entire dataset to be available for processing, RLS updates the estimates of the regression parameters incrementally as new data points are received. This makes RLS particularly useful for real-time applications and systems where data is collected sequentially over time.
+---
 
-### Advantages of RLS
+## **1. Overview**
+- **Goal**: Find and precisely center on a resonant peak in a frequency-domain dataset without doing a single massive sweep.
+- **Approach**:
+  1. **Collect a small window of data** (phase angles at specific frequencies).
+  2. **Use RLS** to smooth/fit a polynomial to these points, computing gradients (slopes, curvature).
+  3. **Analyze** whether the window is rising, falling, or contains a peak.
+  4. **Shift the window** left/right (or expand it) based on gradient analysis.
+  5. **Verify** if the peak is properly centered (strong rise on the left, strong fall on the right).
+  6. **Repeat** until a confirmed, centered peak is found (or until boundary/time limits are reached).
 
-- **Efficiency**: RLS updates the regression parameters in constant time, making it computationally efficient for large datasets.
-- **Real-time Processing**: Ideal for scenarios where data arrives in a stream, such as sensor data or financial time series.
-- **Memory Usage**: Requires less memory as it does not need to store the entire dataset.
+---
 
-## How It Uses RLS
+## **2. Why a Sliding Window?**
+### **Data Can Be Noisy**
+- Large sweeps can be cumbersome. Focusing on a smaller slice ("window") at a time allows for more efficient polynomial regression. It also keeps the analysis "local," which is useful for honing in on the actual peak.
 
-The RLS algorithm maintains and updates the following key components:
-- **Inverse Covariance Matrix**: Used to update the parameter estimates efficiently.
-- **Regression Coefficients**: Represents the slope and intercept of the fitted line.
-- **Residual Sum of Squares**: Keeps track of the sum of squared residuals for calculating standard error.
+### **Adaptive Sweeping**
+- By not scanning blindly over every frequency, the algorithm can quickly home in on where the peak likely is, potentially saving time and handling unknown damping factors or broad/narrow peaks more gracefully.
 
-### Process for Each New Data Point:
+---
 
-1. **Data Point Representation**: The new data point is represented as a vector `x` where `x[0]` is the index of the data point (time step) and `x[1]` is always 1 (for the intercept term).
+## **3. RLS Polynomial Regression**
+- **Incremental Updates**:
+  - New data points are added (old points removed) without recalculating the entire polynomial fit from scratch, thanks to Recursive Least Squares.
+- **Rolling Polynomial Fit**:
+  - Maintains a "rolling" polynomial fit of the current window. Once fit, it calculates:
+    - **First-order gradient** (slope) to see if we are going up or down.
+    - **Second-order gradient** (curvature) to detect the shape of the potential peak.
 
-2. **Intermediate Calculations**:
-   - **Temporary Scalar (`temp`)**: Ensures numerical stability and is used to adjust the inverse covariance matrix.
-   - **Temporary Vector (`tmp`)**: Helps in updating the inverse covariance matrix.
+---
 
-3. **Update Inverse Covariance Matrix**:
-   - Adjust the matrix to account for the new data point.
-   - Ensure the matrix remains symmetric.
+## **4. Determining Peak vs. No Peak**
+- **Gradient Threshold**:
+  - The algorithm checks for gradients above a specific threshold to determine slope significance, accounting for variations in material damping.
+- **Centering the Peak**:
+  - If a peak is detected but not centered, the window is shifted based on gradient trends.
+  - A peak is considered centered if consistent negative gradients lead to a value of approximately `-1.0`.
+- **Peak Verification**:
+  - Verifies the peak by checking the **second-order gradients**:
+    - Left side: strongly positive second-order gradients.
+    - Right side: strongly negative second-order gradients.
+- **Handling Truncation**:
+  - If part of the peak is outside the window, the window is expanded or shifted to fully encompass it.
 
-4. **Update Regression Coefficients**:
-   - Update the slope and intercept based on the new data point.
-   - Use the adjusted inverse covariance matrix to refine the estimates.
+---
 
-5. **Update Residual Sum of Squares**:
-   - Calculate the contribution of the new data point to the residual sum of squares.
+## **5. Error Control**
+To ensure the algorithm doesn’t get stuck:
+- If the sliding window moves left, then right, and left again, or moves right, then left, and right again, the analysis is **cancelled**.
+- Once an error condition is detected, the process resets or terminates based on program rules.
 
-6. **Increment Data Point Count**:
-   - Keep track of the number of data points processed.
+---
 
-## Components and Functionality
+## **6. Buffer Management**
+- The impedance analyzer chip outputs values that are stored in a **local buffer**.
+- This buffer begins filling from the **middle** of the buffer array and dynamically expands:
+  - To the left if the sliding window moves toward lower frequencies.
+  - To the right if the sliding window moves toward higher frequencies.
+- This design ensures efficient memory usage while maintaining flexibility.
 
-### RunningGradient Structure
+---
 
-The `RunningGradient` structure holds the state for the running gradient calculation. It includes:
-- `num_points`: The number of data points processed.
-- `inverse_cov_matrix`: The inverse of the covariance matrix (2x2 matrix).
-- `coefficients`: The regression coefficients (slope and intercept).
-- `residual_sum_squares`: The sum of the squared residuals.
+## **7. How the Program Decides to Move Left or Right**
+The function `determineMoveDirection()` decides the sliding window's movement based on gradient trends:
 
-## Windowed Running Gradient
+1. **Trend Counts**:
+   - Analyzes the longest consistent increasing and decreasing trends to assess data distribution.
+2. **Threshold Comparison**:
+   - Moves if trend counts exceed `TREND_THRESHOLD`, signaling significant slopes.
+3. **Global Gradients Check**:
+   - Evaluates maximum and minimum gradients to detect if values fall within an "undecided" range.
+4. **Final Decision**:
+   - **Strong increase only**: Move right.
+   - **Strong decrease only**: Move left.
+   - **Both strong**: Compare gradient sums to determine the dominant direction.
+   - **Weak or balanced**: Remain `UNDECIDED`.
 
-### Overview
+---
 
-To address the limitations of the standard RLS method, a windowed approach to performing running gradient calculations has been introduced. This approach limits the number of data points considered at any given time, preserving local features and improving peak detection in noisy data.
+## **8. State Machine Logic**
+The entire adaptive process is implemented as a **state machine**:
+- **WAITING**: Idle until a new sweep starts.
+- **INITIAL_ANALYSIS**: Load the initial window, perform a quick RLS fit, and analyze initial gradients.
+- **SEGMENT_ANALYSIS / UPDATE_BUFFER_DIRECTION**: Determine the slope direction and shift the window if necessary.
+- **UNDECIDED_TREND_CASE**: Handle ambiguous data patterns by making small adjustments and re-checking.
+- **PEAK_CENTERING**: Attempt to center the peak if it’s partially visible within the window.
+- **PEAK_FINDING_ANALYSIS**: Verify if the peak satisfies all gradient-based conditions.
+- **PEAK_TRUNCATION_HANDLING**: Expand or shift the window if the peak is partially outside its bounds.
+- **EXPAND_ANALYSIS_WINDOW**: Increase the number of data points in the window if more resolution is needed.
+- **WAITING (again)**: Return to idle once the analysis is complete or if error limits are reached.
 
-### Why Use a Windowed Running Gradient?
+---
 
-The windowed running gradient approach is designed to maintain the benefits of RLS while addressing its limitations in preserving local features. By focusing on a fixed number of recent data points, the windowed approach maintains local features, making it better suited for detecting sudden changes.
+## **9. Summary**
+- **Small Windows, Smoothed**: RLS polynomial fits ensure stable gradient estimates within small data slices.
+- **Adaptive**: The algorithm dynamically shifts or expands the window to find the peak efficiently.
+- **Verification**: Additional checks (second-order gradients, consistent slopes) confirm peak validity and centering.
+- **Error Handling**: Mechanisms detect and reset the process if the algorithm becomes stuck.
+- **State Machine Control**: A clear series of states governs the analysis flow, ensuring systematic decisions.
 
-#### Advantages of the Windowed Approach
+---
 
-- **Local Feature Preservation**: By focusing on a fixed number of recent data points, the windowed approach maintains local features, making it better suited for detecting sudden changes.
-- **Noise Reduction**: Helps in reducing the impact of older data, which may introduce noise if the underlying data distribution changes over time.
-- **Adaptability**: More adaptable to changes in the data pattern, which is crucial for applications like financial data analysis and real-time monitoring systems.
-
-### How It Uses a Windowed RLS
-
-The windowed RLS algorithm maintains and updates the following key components within a fixed-size window:
-- **Data Arrays (`x` and `y`)**: Store the most recent data points.
-- **Regression Coefficients**: Represent the slope and intercept of the fitted line for the current window.
-- **Residual Sum of Squares**: Tracks the sum of squared residuals for the data points within the window.
-
-#### Process for Each New Data Point
-
-1. **Data Point Addition**:
-   - Add the new data point to the window. If the window is full, remove the oldest data point to make room for the new one.
-   - Represent the data point as a vector `x`, where `x[0]` is the index within the window and `x[1]` is always 1.
-
-2. **Intermediate Calculations**:
-   - **Sum Variables**: Compute sums required for the least squares calculations within the window.
-   - **Denominator Calculation**: Ensure numerical stability and adjust the regression coefficients.
-
-3. **Update Regression Coefficients**:
-   - Recompute the slope and intercept using only the data points within the current window.
-   - Use the computed sums to efficiently update the coefficients.
-
-4. **Update Residual Sum of Squares**:
-   - Calculate the contribution of the new data point and remove the contribution of the oldest data point if the window is full.
-
-5. **Increment Data Point Count**:
-   - Track the number of data points processed within the current window.
-
-## Summary
-
-### Running Gradient
-
-- **Method**: Recursive Least Squares (RLS)
-- **Advantages**: Efficient, real-time processing, low memory usage
-- **Limitations**: Over-smoothing with large datasets, potential masking of local features
-
-### Windowed Running Gradient
-
-- **Method**: Windowed Recursive Least Squares (Windowed RLS)
-- **Advantages**: Preserves local features, reduces noise impact from older data, adaptable to data pattern changes
-- **Limitations**: Fixed window size, potential for less stable long-term trends
-
-This approach ensures you can choose the appropriate method based on your specific application requirements, balancing between long-term trend analysis and local feature preservation.
+### Author
+**Tugbars Heptaskin**  
+Date: **2024-12-30**  
+Version: **1.0**
