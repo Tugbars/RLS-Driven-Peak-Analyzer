@@ -1,4 +1,4 @@
-# RLS based Adaptive Sweep for a handheld Impedance Analyzer
+# RLS based Adaptive Sweep For A Handheld Impedance Analyzer
 
 ## **High-Level Overview**
 
