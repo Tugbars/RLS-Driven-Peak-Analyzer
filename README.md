@@ -101,6 +101,7 @@ The entire adaptive process is implemented as a **state machine**:
 - **PEAK_TRUNCATION_HANDLING**: Expand or shift the window if the peak is partially outside its bounds.
 - **EXPAND_ANALYSIS_WINDOW**: Increase the number of data points in the window if more resolution is needed.
 - **WAITING (again)**: Return to idle once the analysis is complete or if error limits are reached.
+![ActivityUML](https://github.com/user-attachments/assets/e128460d-4f67-44c8-ac2f-869e4a8a98f8)
 
 ---
 
