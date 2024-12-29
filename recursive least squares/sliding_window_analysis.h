@@ -62,7 +62,7 @@ typedef struct {
     Callback_t callback;          /**< Callback function to be invoked during the analysis. */
     bool isTruncatedLeft;         /**< Indicates if the left side of the sliding window is truncated. */
     bool isTruncatedRight;        /**< Indicates if the right side of the sliding window is truncated. */
-    bool isPeakNearBoundary;      /**< Flag to indicate if the peak is near the boundary of the sliding window. */
+    uint16_t peakIndex;      /**< Flag to indicate if the peak is near the boundary of the sliding window. */
     const double* phaseAngles;    /**< Pointer to the array of phase angles to be analyzed. */
     uint16_t phase_angle_size;    /**< Size of the phase angles array. */
 } SlidingWindowAnalysisContext;

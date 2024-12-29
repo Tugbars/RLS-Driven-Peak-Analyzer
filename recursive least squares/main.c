@@ -36,7 +36,7 @@ int main() {
     PrepareBaseSweep(&rawBaseSweep, rawData); 
     currentRawSweep = &rawBaseSweep;
     
-    int start_index = 160;
+    int start_index = 162;
     startSlidingWindowAnalysis(currentRawSweep, start_index, myCallbackFunction); 
    
     return 0;

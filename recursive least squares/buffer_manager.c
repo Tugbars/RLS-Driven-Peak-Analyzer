@@ -554,6 +554,8 @@ BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uin
         printf("Error: Analysis interval not properly initialized.\n");
         return result;
     }
+    
+    printf("passed peak Index: %u\n", adjustedBufferIndex);
 
     // Convert analysis_start_index and analysis_end_index to adjusted buffer indices
     int relativeStartPosition = analysis_start_index - buffer_manager.current_phase_index;
@@ -590,4 +592,4 @@ BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uin
     printf("Adjusted Buffer Index %d is not near any boundary.\n", adjustedBufferIndex);
     return result;
 }
-//analysis start index should be modified to adjusted buffer index first.
+

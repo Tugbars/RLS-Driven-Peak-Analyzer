@@ -17,7 +17,7 @@
 
 #define PEAK_VERIFICATION_COUNT 5
 
-#define MAX_SAVGOL_WINDOW_SIZE 15
+#define MAX_SAVGOL_WINDOW_SIZE 25
 
 /******************************************************************************/
 /* Global Variables */
@@ -339,7 +339,7 @@ void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t c
 	ctx.callback = callback;
 	ctx.isTruncatedLeft = false;
 	ctx.isTruncatedRight = false;
-	ctx.isPeakNearBoundary = false;
+	ctx.peakIndex = 0;
 
 	// Initialize the buffer manager
 	initBufferManager(sweep->data, start_index);
@@ -399,7 +399,8 @@ static void OnEntrySegmentAnalysis(void) {
 	                                    gradientOrder
 	                                );
 
-	//printPeakAnalysisResult(&peakResult);
+	// isSweepDone can be activated if the peak is verified in performPeakAnalysis. For debugging purposes I do not see the point.
+	// the state machine is however built around it. 
 
 	// peakResult.isCenteringNeeded, OnPeak utilize edilmiyor sorun o.
 	if(peakResult.isSignificantPeak)
@@ -413,16 +414,12 @@ static void OnEntrySegmentAnalysis(void) {
 	// Update the shift tracker with the new direction
 	update_shift_tracker(ctx.direction);
 
-	//saC'ma bir Eekilde undecided'a giriyor.
-
 	// Check if we are on the peak
-	if (ctx.direction == ON_THE_PEAK) {  //SORUN.
-
+	if (ctx.direction == ON_THE_PEAK) { 
+	    
 	} else if (ctx.direction == UNDECIDED || ctx.direction == NEGATIVE_UNDECIDED) {
 		currentStatus.isUndecided = 1;  // Raise undecided flag for both cases
 	}
-
-
 
 	// Mark this state as complete and proceed to the next state
 	STATE_FUNCS[SWP_SEGMENT_ANALYSIS].isComplete = true;
@@ -734,9 +731,7 @@ static uint16_t perform_peak_verification(void) {
 
 	// Process peak verification result, if successful or not
 	if (process_peak_verification(&verificationResult)) {  //process_peak_verification
-		//bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
-		//if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
-
+        ctx.peakIndex = verificationResult.peak_index;
 		return verificationResult.peak_index; // Peak is centered, no further action needed
 	}
 }
@@ -920,11 +915,8 @@ static void OnEntryPeakTruncationHandling(void) {
 static void OnEntryExpandAnalysisWindow(void) {
 	printf("[SWP_EXPAND_ANALYSIS_WINDOW] Expanding the analysis window for Savitzky-Golay filter.\n");
 
-	// Determine the adjusted buffer index for the current peak or center point
-	uint16_t currentAdjustedIndex = buffer_manager.current_buffer_index;
-
 	// Check proximity to boundaries using the new function
-	BoundaryProximityResult proximityResult = checkBoundaryProximity(currentAdjustedIndex, MAX_SAVGOL_WINDOW_SIZE / 2);
+	BoundaryProximityResult proximityResult = checkBoundaryProximity(ctx.peakIndex, MAX_SAVGOL_WINDOW_SIZE / 2);
 
 	// Handle proximity to boundaries
 	if (proximityResult.isNearBoundary) {
@@ -1017,6 +1009,7 @@ static void OnExitPeakTruncationHandling(void) {
 		//bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
 		//if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
 		//ctx.isPeakNearBoundary = true;
+		ctx.peakIndex = verificationResult.peak_index;
 		currentStatus.isSweepDone = 1;  // Mark the sweep as done
 		// Now the state is ready to transition, mark it complete
 
