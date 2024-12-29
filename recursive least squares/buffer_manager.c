@@ -532,15 +532,27 @@ void print_analysis_interval(void) {
  *
  * This function converts the `analysis_start_index` and `analysis_end_index` to adjusted buffer indices
  * and directly compares the given adjusted buffer index to these converted values to determine proximity.
+ * It also returns the direction of proximity and the amount needed to expand the window if required.
  *
  * @param adjustedBufferIndex The adjusted buffer index to check.
- * @return bool Returns true if the index is near the boundary, false otherwise.
+ * @param indexIdentifier The threshold distance from the boundary.
+ * @return BoundaryProximityResult Struct containing proximity information:
+ *         - `isNearBoundary`: True if the index is near a boundary, false otherwise.
+ *         - `moveAmount`: The amount needed to expand the window.
+ *         - `direction`: The direction of proximity (LEFT or RIGHT).
  */
-bool isIndexNearBoundary(uint16_t adjustedBufferIndex, uint16_t indexIdentifier) {
+BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uint16_t indexIdentifier) {
+    // Struct to hold the result
+    BoundaryProximityResult result = {
+        .isNearBoundary = false,
+        .moveAmount = 0,
+        .direction = UNDECIDED
+    };
+
     // Validate that the analysis interval is defined
     if (analysis_start_index == -1 || analysis_end_index == -1) {
         printf("Error: Analysis interval not properly initialized.\n");
-        return false;
+        return result;
     }
 
     // Convert analysis_start_index and analysis_end_index to adjusted buffer indices
@@ -556,16 +568,26 @@ bool isIndexNearBoundary(uint16_t adjustedBufferIndex, uint16_t indexIdentifier)
     printf("Analysis End Index: %d -> Adjusted End Index: %d\n", analysis_end_index, adjustedEndIndex);
 #endif
 
-    // Check if the adjustedBufferIndex is near the start or end adjusted indices
-    if ((adjustedBufferIndex >= adjustedStartIndex && adjustedBufferIndex <= adjustedStartIndex + indexIdentifier) || 
-        (adjustedBufferIndex <= adjustedEndIndex && adjustedBufferIndex >= adjustedEndIndex - indexIdentifier)) {
-        printf("Adjusted Buffer Index %d is near the boundary.\n", adjustedBufferIndex);
-        return true;  // Index is near the boundary
+    // Check proximity to the start boundary
+    if (adjustedBufferIndex >= adjustedStartIndex && adjustedBufferIndex <= adjustedStartIndex + indexIdentifier) {
+        result.isNearBoundary = true;
+        result.direction = LEFT_SIDE;
+        result.moveAmount = adjustedStartIndex + indexIdentifier - adjustedBufferIndex;
+        printf("Adjusted Buffer Index %d is near the left boundary. Move amount: %d\n", adjustedBufferIndex, result.moveAmount);
+        return result;  // Early return since proximity is confirmed
+    }
+
+    // Check proximity to the end boundary
+    if (adjustedBufferIndex <= adjustedEndIndex && adjustedBufferIndex >= adjustedEndIndex - indexIdentifier) {
+        result.isNearBoundary = true;
+        result.direction = RIGHT_SIDE;
+        result.moveAmount = adjustedBufferIndex - (adjustedEndIndex - indexIdentifier);
+        printf("Adjusted Buffer Index %d is near the right boundary. Move amount: %d\n", adjustedBufferIndex, result.moveAmount);
+        return result;  // Early return since proximity is confirmed
     }
 
     // Not near any boundary
-    printf("Adjusted Buffer Index %d is not near the boundary.\n", adjustedBufferIndex);
-    return false;
+    printf("Adjusted Buffer Index %d is not near any boundary.\n", adjustedBufferIndex);
+    return result;
 }
-
 //analysis start index should be modified to adjusted buffer index first.

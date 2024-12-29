@@ -10,7 +10,7 @@
  * This file contains function declarations and data structures used for analyzing phase angle data
  * using sliding window techniques.
  */
- 
+
 #define FORGETTING_FACTOR_ADJUSTMENT 0.2
 
 #define CENTERING_RATIO 2
@@ -30,17 +30,17 @@
  * such as whether a peak is found, if the analysis is undecided, or if the peak is centered.
  */
 typedef union {
-    uint8_t value; /**< The combined value of all status flags. */
-    struct {
-        uint8_t isPeakFound : 1;            /**< Flag indicating if a peak is found. */
-        uint8_t isUndecided : 1;            /**< Flag indicating if the analysis is undecided. */
-        uint8_t isCentered : 1;             /**< Flag indicating if the peak is centered. */
-        uint8_t isSweepRequested : 1;       /**< Flag indicating if a sweep is requested. */
-        uint8_t isSweepDone : 1;            /**< Flag indicating if the sweep is done. */
-        uint8_t isNotCentered : 1;          /**< Flag indicating if the peak is still not centered. */
-        uint8_t isVerificationFailed : 1;   /**< Flag indicating if peak verification failed. */
-        uint8_t isBoundaryError : 1;        /**< Flag indicating if a boundary error occurred. */
-    };
+	uint8_t value; /**< The combined value of all status flags. */
+	struct {
+		uint8_t isPeakFound : 1;            /**< Flag indicating if a peak is found. */
+		uint8_t isUndecided : 1;            /**< Flag indicating if the analysis is undecided. */
+		uint8_t isCentered : 1;             /**< Flag indicating if the peak is centered. */
+		uint8_t isSweepRequested : 1;       /**< Flag indicating if a sweep is requested. */
+		uint8_t isSweepDone : 1;            /**< Flag indicating if the sweep is done. */
+		uint8_t isNotCentered : 1;          /**< Flag indicating if the peak is still not centered. */
+		uint8_t isVerificationFailed : 1;   /**< Flag indicating if peak verification failed. */
+		uint8_t isBoundaryError : 1;        /**< Flag indicating if a boundary error occurred. */
+	};
 } SwpStatus_t;
 
 /** @brief Context for sliding window analysis. */
@@ -95,32 +95,32 @@ static const uint8_t MAX_UNDECIDED_CASE_ATTEMPTS = 7;
 
 /**
  * @brief Defines the maximum number of peak centering attempts.
- * 
+ *
  * This constant sets a limit on the number of times the algorithm will attempt to center the peak.
  * After reaching this limit, the system will stop further attempts to prevent an infinite loop in cases
- * where the peak cannot be accurately centered. This ensures that the process either succeeds within 
+ * where the peak cannot be accurately centered. This ensures that the process either succeeds within
  * a reasonable number of attempts or gracefully exits if centering is not possible.
  */
 #define MAX_CENTERING_ATTEMPTS 4
 
 /**
  * @brief Tracks the number of attempts made to center the peak.
- * 
- * This variable is used to limit the number of centering attempts in the peak centering state. 
- * Each time the peak centering process fails to accurately center the peak, this counter is 
+ *
+ * This variable is used to limit the number of centering attempts in the peak centering state.
+ * Each time the peak centering process fails to accurately center the peak, this counter is
  * incremented. Once it reaches a predefined maximum number of attempts (MAX_CENTERING_ATTEMPTS),
- * the system will exit the centering state and transition to a waiting or error state to prevent 
+ * the system will exit the centering state and transition to a waiting or error state to prevent
  * an infinite loop in cases where the peak cannot be centered properly.
  */
 static uint8_t centering_attempts = 0;
 
 /**
  * @brief Adjusts the forgetting factor used in peak centering analysis.
- * 
- * The forgetting factor controls how much weight is given to more recent data points during the 
- * gradient analysis for peak centering. This variable is incremented by 0.1 after each centering 
- * attempt to give more weight to the newer data points, allowing the algorithm to make progressively 
- * larger adjustments in subsequent attempts. This helps improve the accuracy of peak centering 
+ *
+ * The forgetting factor controls how much weight is given to more recent data points during the
+ * gradient analysis for peak centering. This variable is incremented by 0.1 after each centering
+ * attempt to give more weight to the newer data points, allowing the algorithm to make progressively
+ * larger adjustments in subsequent attempts. This helps improve the accuracy of peak centering
  * over multiple attempts.
  */
 static double centering_forgetting_factor = 0.7;
@@ -128,14 +128,14 @@ static double centering_forgetting_factor = 0.7;
 /*******************************************************************************
  * Repetitive shift deadlock error control
  ******************************************************************************/
- 
- /**
- * @brief Size of the shift tracker array used to detect alternating left and right shifts.
- *
- * This constant defines the size of the `shift_tracker` array, which stores the last two
- * shift directions (LEFT, RIGHT) made during the sliding window analysis. The purpose is to
- * detect whether the analysis is getting stuck in an alternating pattern of shifts.
- */
+
+/**
+* @brief Size of the shift tracker array used to detect alternating left and right shifts.
+*
+* This constant defines the size of the `shift_tracker` array, which stores the last two
+* shift directions (LEFT, RIGHT) made during the sliding window analysis. The purpose is to
+* detect whether the analysis is getting stuck in an alternating pattern of shifts.
+*/
 #define SHIFT_TRACKER_SIZE 2
 
 /**
@@ -168,17 +168,17 @@ static uint8_t shift_tracker_index = 0;
  * @param new_direction The new shift direction (LEFT, RIGHT, or UNDECIDED).
  */
 static void update_shift_tracker(PeakPosition new_direction) {
-    // Update the shift tracker with the latest direction
-    shift_tracker[shift_tracker_index] = new_direction;
-    shift_tracker_index = (shift_tracker_index + 1) % SHIFT_TRACKER_SIZE;
+	// Update the shift tracker with the latest direction
+	shift_tracker[shift_tracker_index] = new_direction;
+	shift_tracker_index = (shift_tracker_index + 1) % SHIFT_TRACKER_SIZE;
 
-    // Check if the analysis is stuck (LEFT → RIGHT → LEFT or RIGHT → LEFT → RIGHT)
-    if ((shift_tracker[0] == LEFT_SIDE && shift_tracker[1] == RIGHT_SIDE) ||
-        (shift_tracker[0] == RIGHT_SIDE && shift_tracker[1] == LEFT_SIDE)) {
-        printf("Error: Sliding window analysis is stuck alternating between left and right shifts.\n");
-        boundaryErrorOccurred = true;  // Raise an error flag
-        currentStatus.isSweepDone = 1; // End the analysis and go to SWP_WAITING
-    }
+	// Check if the analysis is stuck (LEFT b RIGHT b LEFT or RIGHT b LEFT b RIGHT)
+	if ((shift_tracker[0] == LEFT_SIDE && shift_tracker[1] == RIGHT_SIDE) ||
+	        (shift_tracker[0] == RIGHT_SIDE && shift_tracker[1] == LEFT_SIDE)) {
+		printf("Error: Sliding window analysis is stuck alternating between left and right shifts.\n");
+		boundaryErrorOccurred = true;  // Raise an error flag
+		currentStatus.isSweepDone = 1; // End the analysis and go to SWP_WAITING
+	}
 }
 
 /******************************************************************************/
@@ -194,6 +194,7 @@ static void OnEntryPeakFindingAnalysis(void);
 static void OnEntryWaiting(void);
 static void OnEntryPeakTruncationHandling(void);
 static void OnEntryPeakCentering(void);
+static void OnEntryExpandAnalysisWindow(void);
 
 static void OnExitInitialAnalysis(void);
 static void OnExitSegmentAnalysis(void);
@@ -203,6 +204,7 @@ static void OnExitPeakFindingAnalysis(void);
 static void OnExitWaiting(void);
 static void OnExitPeakCentering(void);
 static void OnExitPeakTruncationHandling(void);
+static void OnExitExpandAnalysisWindow(void);
 
 // Forward declaration of startAdaptiveSweep function
 static void startAdaptiveSweep(void);
@@ -219,9 +221,9 @@ static SwpState_t NextState(SwpState_t state);
  * @brief Structure containing function pointers and completion status for state functions.
  */
 typedef struct {
-    void (*onEntry)(void);
-    void (*onExit)(void);
-    bool isComplete;
+	void (*onEntry)(void);
+	void (*onExit)(void);
+	bool isComplete;
 } StateFuncs_t;
 
 /**
@@ -231,14 +233,15 @@ typedef struct {
  * indicating whether the state's processing is complete.
  */
 static StateFuncs_t STATE_FUNCS[SWP_STATE_LAST] = {
-    {OnEntryInitialAnalysis, OnExitInitialAnalysis, false},         // SWP_INITIAL_ANALYSIS
-    {OnEntrySegmentAnalysis, OnExitSegmentAnalysis, false},         // SWP_SEGMENT_ANALYSIS
-    {OnEntryUpdateBufferDirection, OnExitUpdateBufferDirection, false}, // SWP_UPDATE_BUFFER_DIRECTION
-    {OnEntryUndecidedTrendCase, OnExitUndecidedTrendCase, false},   // SWP_UNDECIDED_TREND_CASE
-    {OnEntryPeakCentering, OnExitPeakCentering, false},             // SWP_PEAK_CENTERING
-    {OnEntryPeakFindingAnalysis, OnExitPeakFindingAnalysis, false}, // SWP_PEAK_FINDING_ANALYSIS
-    {OnEntryPeakTruncationHandling, OnExitPeakTruncationHandling, false}, // SWP_PEAK_TRUNCATION_HANDLING
-    {OnEntryWaiting, OnExitWaiting, false}                          // SWP_WAITING
+	{OnEntryInitialAnalysis, OnExitInitialAnalysis, false},         // SWP_INITIAL_ANALYSIS
+	{OnEntrySegmentAnalysis, OnExitSegmentAnalysis, false},         // SWP_SEGMENT_ANALYSIS
+	{OnEntryUpdateBufferDirection, OnExitUpdateBufferDirection, false}, // SWP_UPDATE_BUFFER_DIRECTION
+	{OnEntryUndecidedTrendCase, OnExitUndecidedTrendCase, false},   // SWP_UNDECIDED_TREND_CASE
+	{OnEntryPeakCentering, OnExitPeakCentering, false},             // SWP_PEAK_CENTERING
+	{OnEntryPeakFindingAnalysis, OnExitPeakFindingAnalysis, false}, // SWP_PEAK_FINDING_ANALYSIS
+	{OnEntryPeakTruncationHandling, OnExitPeakTruncationHandling, false}, // SWP_PEAK_TRUNCATION_HANDLING
+	{OnEntryExpandAnalysisWindow, OnExitExpandAnalysisWindow, false}, // SWP_EXPAND_ANALYSIS_WINDOW
+	{OnEntryWaiting, OnExitWaiting, false}                          // SWP_WAITING
 };
 /******************************************************************************/
 /* Sliding Window Analysis Functions */
@@ -249,13 +252,13 @@ static StateFuncs_t STATE_FUNCS[SWP_STATE_LAST] = {
  * with adaptive sweep or proceed with the next state change. If buffer updates are needed,
  * it calls `startAdaptiveSweep`. Otherwise, it proceeds to call `SwpProcessStateChange`.
  */
-static void concludeSweepState(void) {           
-    if (buffer_update_info.needs_update) {
-        startAdaptiveSweep();  // Take note: This is the adaptive sweep function that will be called
-    } else {
-      
-        SwpProcessStateChange();
-    }
+static void concludeSweepState(void) {
+	if (buffer_update_info.needs_update) {
+		startAdaptiveSweep();  // Take note: This is the adaptive sweep function that will be called
+	} else {
+
+		SwpProcessStateChange();
+	}
 }
 
 /**
@@ -269,18 +272,18 @@ static void concludeSweepState(void) {
  * @param isSweepComplete Flag indicating whether the sweep process is complete.
  */
 static void adaptiveSweepSampleCb(double real, double imaginary, bool isSweepComplete) {
-    // Simulate data collection by calling `AdptSweepAddDataPoint` with the new real and imaginary values.
-    AdptSweepAddDataPoint(real, imaginary);  // Pass the real and imaginary values directly to the function
+	// Simulate data collection by calling `AdptSweepAddDataPoint` with the new real and imaginary values.
+	AdptSweepAddDataPoint(real, imaginary);  // Pass the real and imaginary values directly to the function
 
-    // Reset the update flag after processing
-    buffer_update_info.needs_update = false;
+	// Reset the update flag after processing
+	buffer_update_info.needs_update = false;
 
-    // After completing data collection, finalize the sweep process
-    if (isSweepComplete) {
-        currentStatus.isSweepDone = true;
-        // Trigger the state change after the sweep is done
-        SwpProcessStateChange();
-    }
+	// After completing data collection, finalize the sweep process
+	if (isSweepComplete) {
+		currentStatus.isSweepDone = true;
+		// Trigger the state change after the sweep is done
+		SwpProcessStateChange();
+	}
 }
 
 
@@ -289,13 +292,13 @@ static void adaptiveSweepSampleCb(double real, double imaginary, bool isSweepCom
  * After collecting data, it calls `concludeSweepState` to either continue or finalize the sweep.
  */
 static void startAdaptiveSweep(void) {
-    //set it to 0 before starting a sweep. the sweep count is used in mapping the collected data points with the data buffer.
-    currentRawSweep->count = 0;
+	//set it to 0 before starting a sweep. the sweep count is used in mapping the collected data points with the data buffer.
+	currentRawSweep->count = 0;
 
-    HalIcsSetStartFreq(buffer_update_info.phase_index_start);
-    HalIcsSetFreqInc(currentRawSweep->setup->frequencyIncrement);
-    HalIcsSetNoOfSamples(buffer_update_info.move_amount);
-    HalIcsStartFreqSweep(adaptiveSweepSampleCb);
+	HalIcsSetStartFreq(buffer_update_info.phase_index_start);
+	HalIcsSetFreqInc(currentRawSweep->setup->frequencyIncrement);
+	HalIcsSetNoOfSamples(buffer_update_info.move_amount);
+	HalIcsStartFreqSweep(adaptiveSweepSampleCb);
 }
 
 
@@ -306,19 +309,19 @@ static void startAdaptiveSweep(void) {
  * window size, starting index, and frequency parameters.
  */
 static void initBufferManager(MqsRawDataPoint_t* dataBuffer, int start_index) {
-    // Initialize the buffer manager with appropriate parameters
-    // Arguments:
-    // buffer          -> The buffer that will store the phase and impedance values (array of MqsRawDataPoint_t)
-    // BUFFER_SIZE     -> Total size of the buffer (maximum number of data points the buffer can hold)
-    // 30              -> Sliding window size (number of data points to analyze in each window)
-    // 0               -> Starting index in the phaseAngles array (this could be any index where you want to start the analysis)
-    // 11300.0         -> Starting frequency for the frequency sweep (in Hz, e.g., starting at 11300 Hz)
-    // 1.0             -> Frequency increment per step (in Hz, e.g., increment by 1 Hz for each data point)                                                                                                               
-    init_buffer_manager(dataBuffer, MQS_SWEEP_MAX_NUMBER_OF_SAMPLES, RLS_WINDOW, start_index, 11300.0, 1.5);                                                    
+	// Initialize the buffer manager with appropriate parameters
+	// Arguments:
+	// buffer          -> The buffer that will store the phase and impedance values (array of MqsRawDataPoint_t)
+	// BUFFER_SIZE     -> Total size of the buffer (maximum number of data points the buffer can hold)
+	// 30              -> Sliding window size (number of data points to analyze in each window)
+	// 0               -> Starting index in the phaseAngles array (this could be any index where you want to start the analysis)
+	// 11300.0         -> Starting frequency for the frequency sweep (in Hz, e.g., starting at 11300 Hz)
+	// 1.0             -> Frequency increment per step (in Hz, e.g., increment by 1 Hz for each data point)
+	init_buffer_manager(dataBuffer, MQS_SWEEP_MAX_NUMBER_OF_SAMPLES, RLS_WINDOW, start_index, 11300.0, 1.5);
 
-    // Debugging: Print initialization state
-    //printf("[DEBUG] Buffer Manager initialized:\n");
-    //printf("Buffer size: %d, Window size: %d, Start index: %d\n", BUFFER_SIZE, WINDOW_SIZE, start_index);
+	// Debugging: Print initialization state
+	//printf("[DEBUG] Buffer Manager initialized:\n");
+	//printf("Buffer size: %d, Window size: %d, Start index: %d\n", BUFFER_SIZE, WINDOW_SIZE, start_index);
 }
 
 
@@ -332,23 +335,23 @@ static void initBufferManager(MqsRawDataPoint_t* dataBuffer, int start_index) {
  * @param phase_angle_size Size of the phase angle array.
  * @param callback Function pointer to the callback function to be executed after analysis.
  */
-void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t callback) { //ILK MES START OLARAK GOREV ALABILIR. 
-    ctx.callback = callback;
-    ctx.isTruncatedLeft = false;
-    ctx.isTruncatedRight = false;
-    ctx.isPeakNearBoundary = false;
+void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t callback) { //ILK MES START OLARAK GOREV ALABILIR.
+	ctx.callback = callback;
+	ctx.isTruncatedLeft = false;
+	ctx.isTruncatedRight = false;
+	ctx.isPeakNearBoundary = false;
 
-    // Initialize the buffer manager
-    initBufferManager(sweep->data, start_index);
-    
-    // Enable sweep request
-    currentStatus.isSweepRequested = 1;  // Start sweep request
+	// Initialize the buffer manager
+	initBufferManager(sweep->data, start_index);
 
-    // Set the initial state to waiting
-    currentState = SWP_WAITING;
+	// Enable sweep request
+	currentStatus.isSweepRequested = 1;  // Start sweep request
 
-    // Set the initial state and start the state machine
-    SwpProcessStateChange();  // Start the state machine
+	// Set the initial state to waiting
+	currentState = SWP_WAITING;
+
+	// Set the initial state and start the state machine
+	SwpProcessStateChange();  // Start the state machine
 }
 
 
@@ -362,15 +365,15 @@ void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t c
  * This function loads the initial buffer with phase angle data and sets the sweep request flag.
  */
 static void OnEntryInitialAnalysis(void) {
-    // Call load_initial_buffer to set up buffer update
-    load_initial_buffer();
+	// Call load_initial_buffer to set up buffer update
+	load_initial_buffer();
 
-    // Set the sweep request flag and mark this state as complete
-    currentStatus.isSweepRequested = true;
-    STATE_FUNCS[SWP_INITIAL_ANALYSIS].isComplete = true;
+	// Set the sweep request flag and mark this state as complete
+	currentStatus.isSweepRequested = true;
+	STATE_FUNCS[SWP_INITIAL_ANALYSIS].isComplete = true;
 
-    // Transition to conclude the sweep state, which will handle the async sweep
-    concludeSweepState();
+	// Transition to conclude the sweep state, which will handle the async sweep
+	concludeSweepState();
 }
 
 
@@ -382,48 +385,48 @@ static void OnEntryInitialAnalysis(void) {
  * the `SWP_WAITING` state to prevent infinite looping.
  */
 static void OnEntrySegmentAnalysis(void) {
-    
-    uint8_t degree = 3;             // Degree for RLS regression
-    GradientOrder gradientOrder = GRADIENT_ORDER_FIRST;  // Change as needed
 
-    //printf("=== Performing Peak Analysis ===\n");
-    PeakAnalysisResult peakResult = performPeakAnalysis(
-        buffer_manager.buffer,
-        RLS_WINDOW, //not necessary
-        buffer_manager.current_buffer_index,
-        buffer_manager.window_size,
-        degree,
-        gradientOrder
-    );
-    
-    //printPeakAnalysisResult(&peakResult);
-    
-    // peakResult.isCenteringNeeded, OnPeak utilize edilmiyor sorun o.
-    if(peakResult.isSignificantPeak)
-    { 
-    currentStatus.isPeakFound = 1; 
-    }
-    
-    // Update the context with the direction result
-    ctx.direction = peakResult.moveDirection;
-    
-    // Update the shift tracker with the new direction
-    update_shift_tracker(ctx.direction);
-    
-    //saçma bir şekilde undecided'a giriyor. 
-  
-    // Check if we are on the peak
-    if (ctx.direction == ON_THE_PEAK) {  //SORUN. 
-        
-    } else if (ctx.direction == UNDECIDED || ctx.direction == NEGATIVE_UNDECIDED) {
-        currentStatus.isUndecided = 1;  // Raise undecided flag for both cases
-    }
-    
-    
+	uint8_t degree = 3;             // Degree for RLS regression
+	GradientOrder gradientOrder = GRADIENT_ORDER_FIRST;  // Change as needed
 
-    // Mark this state as complete and proceed to the next state
-    STATE_FUNCS[SWP_SEGMENT_ANALYSIS].isComplete = true;
-    SwpProcessStateChange();
+	//printf("=== Performing Peak Analysis ===\n");
+	PeakAnalysisResult peakResult = performPeakAnalysis(
+	                                    buffer_manager.buffer,
+	                                    RLS_WINDOW, //not necessary
+	                                    buffer_manager.current_buffer_index,
+	                                    buffer_manager.window_size,
+	                                    degree,
+	                                    gradientOrder
+	                                );
+
+	//printPeakAnalysisResult(&peakResult);
+
+	// peakResult.isCenteringNeeded, OnPeak utilize edilmiyor sorun o.
+	if(peakResult.isSignificantPeak)
+	{
+		currentStatus.isPeakFound = 1;
+	}
+
+	// Update the context with the direction result
+	ctx.direction = peakResult.moveDirection;
+
+	// Update the shift tracker with the new direction
+	update_shift_tracker(ctx.direction);
+
+	//saC'ma bir Eekilde undecided'a giriyor.
+
+	// Check if we are on the peak
+	if (ctx.direction == ON_THE_PEAK) {  //SORUN.
+
+	} else if (ctx.direction == UNDECIDED || ctx.direction == NEGATIVE_UNDECIDED) {
+		currentStatus.isUndecided = 1;  // Raise undecided flag for both cases
+	}
+
+
+
+	// Mark this state as complete and proceed to the next state
+	STATE_FUNCS[SWP_SEGMENT_ANALYSIS].isComplete = true;
+	SwpProcessStateChange();
 }
 
 
@@ -433,14 +436,14 @@ static void OnEntrySegmentAnalysis(void) {
  * This function updates the buffer based on the determined direction from the segment analysis.
  */
 static void OnEntryUpdateBufferDirection(void) {
-    
-    // Set up buffer update info
-    update_buffer_for_direction(ctx.direction, buffer_manager.window_size / 2);
-    
-    STATE_FUNCS[SWP_UPDATE_BUFFER_DIRECTION].isComplete = true;
 
-    // After setting up, perform the buffer update if needed
-    concludeSweepState();                                                                                              
+	// Set up buffer update info
+	update_buffer_for_direction(ctx.direction, buffer_manager.window_size / 2);
+
+	STATE_FUNCS[SWP_UPDATE_BUFFER_DIRECTION].isComplete = true;
+
+	// After setting up, perform the buffer update if needed
+	concludeSweepState();
 }
 
 
@@ -451,26 +454,26 @@ static void OnEntryUpdateBufferDirection(void) {
  * If it's a negative undecided case, it moves the window backward instead.
  */
 static void OnEntryUndecidedTrendCase(void) {
-    
-    if (undecided_case_counter >= MAX_UNDECIDED_CASE_ATTEMPTS) {
-        // Set the error flag and transition to SWP_WAITING
-        printf("Undecided case limit exceeded. Setting error flag and returning to SWP_WAITING.\n");
-        undecided_error_flag = true;
-        currentState = SWP_WAITING;
-        SwpProcessStateChange();
-        return;
-    }
-    
-    if (ctx.direction == NEGATIVE_UNDECIDED) {
-        handle_negative_undecided_case();  // Move the window backward
-    } else {
-        handle_undecided_case();  // Move the window forward
-    }
 
-    STATE_FUNCS[SWP_UNDECIDED_TREND_CASE].isComplete = true;
-    
-    // After setting up, perform the buffer update if needed
-    concludeSweepState();
+	if (undecided_case_counter >= MAX_UNDECIDED_CASE_ATTEMPTS) {
+		// Set the error flag and transition to SWP_WAITING
+		printf("Undecided case limit exceeded. Setting error flag and returning to SWP_WAITING.\n");
+		undecided_error_flag = true;
+		currentState = SWP_WAITING;
+		SwpProcessStateChange();
+		return;
+	}
+
+	if (ctx.direction == NEGATIVE_UNDECIDED) {
+		handle_negative_undecided_case();  // Move the window backward
+	} else {
+		handle_undecided_case();  // Move the window forward
+	}
+
+	STATE_FUNCS[SWP_UNDECIDED_TREND_CASE].isComplete = true;
+
+	// After setting up, perform the buffer update if needed
+	concludeSweepState();
 }
 
 
@@ -496,15 +499,15 @@ static void OnEntryUndecidedTrendCase(void) {
  * @see SwpProcessStateChange
  */
 static void reset_centering_flags(void) {
-    STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = false;
-    currentStatus.isNotCentered = 0;
+	STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = false;
+	currentStatus.isNotCentered = 0;
 
-    if (centering_attempts >= MAX_CENTERING_ATTEMPTS) {
-        printf("Max centering attempts reached. Transitioning to WAITING state.\n");
-        currentStatus.isSweepDone = 1;
-        STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-        SwpProcessStateChange();
-    }
+	if (centering_attempts >= MAX_CENTERING_ATTEMPTS) {
+		printf("Max centering attempts reached. Transitioning to WAITING state.\n");
+		currentStatus.isSweepDone = 1;
+		STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
+		SwpProcessStateChange();
+	}
 }
 
 
@@ -516,14 +519,14 @@ static void reset_centering_flags(void) {
  * @return int The corresponding integer argument for the move_window_and_update_if_needed function.
  */
 static int convertMoveDirectionToArgument(MoveDirection moveDirection) {
-    switch (moveDirection) {
-        case MOVE_LEFT:
-            return LEFT_SIDE;  // Assuming LEFT_SIDE is defined as the integer expected
-        case MOVE_RIGHT:
-            return RIGHT_SIDE; // Assuming RIGHT_SIDE is defined as the integer expected
-        default:
-            return -1;  // Invalid direction; handle this case appropriately
-    }
+	switch (moveDirection) {
+	case MOVE_LEFT:
+		return LEFT_SIDE;  // Assuming LEFT_SIDE is defined as the integer expected
+	case MOVE_RIGHT:
+		return RIGHT_SIDE; // Assuming RIGHT_SIDE is defined as the integer expected
+	default:
+		return -1;  // Invalid direction; handle this case appropriately
+	}
 }
 
 /**
@@ -558,72 +561,72 @@ static int convertMoveDirectionToArgument(MoveDirection moveDirection) {
  * @see finalize_centering_attempt
  */
 static void OnEntryPeakCentering(void) {
-    // Reset flags and check if centering attempts exceeded
-    reset_centering_flags();
-    if (STATE_FUNCS[SWP_PEAK_CENTERING].isComplete) return; //where doe sthis come from?
-    
-    
-     uint8_t degree = 3;             // Degree for RLS regression
-     printf("\n=== Centering ===\n");
-        // Call identifyAndCalculateCentering to get centering parameters
-        PeakCenteringResult centeringResult = identifyAndCalculateCentering(
-            buffer_manager.buffer,
-            buffer_manager.current_buffer_index,
-            buffer_manager.buffer_size,
-            degree
-        );
-        // Handle invalid trend data
-    //if (handle_invalid_trend_data(&gradient_trends)) return;
-    
-   // Convert moveDirection to the appropriate argument for move_window_and_update_if_needed
-    int directionArg = convertMoveDirectionToArgument(centeringResult.moveDirection);
-    
-    if(!centeringResult.isCentered){
-            move_window_and_update_if_needed(directionArg,  centeringResult.moveAmount);
-            //case SWP_PEAK_FINDING_ANALYSIS: will determine if this is really centered or not, after this function.
-    }
-    
-    currentStatus.isCentered = 1;
-    STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
-    concludeSweepState();  // Finalize buffer updates if needed
+	// Reset flags and check if centering attempts exceeded
+	reset_centering_flags();
+	if (STATE_FUNCS[SWP_PEAK_CENTERING].isComplete) return; //where doe sthis come from?
+
+
+	uint8_t degree = 3;             // Degree for RLS regression
+	printf("\n=== Centering ===\n");
+	// Call identifyAndCalculateCentering to get centering parameters
+	PeakCenteringResult centeringResult = identifyAndCalculateCentering(
+	        buffer_manager.buffer,
+	        buffer_manager.current_buffer_index,
+	        buffer_manager.buffer_size,
+	        degree
+	                                      );
+	// Handle invalid trend data
+	//if (handle_invalid_trend_data(&gradient_trends)) return;
+
+	// Convert moveDirection to the appropriate argument for move_window_and_update_if_needed
+	int directionArg = convertMoveDirectionToArgument(centeringResult.moveDirection);
+
+	if(!centeringResult.isCentered) {
+		move_window_and_update_if_needed(directionArg,  centeringResult.moveAmount);
+		//case SWP_PEAK_FINDING_ANALYSIS: will determine if this is really centered or not, after this function.
+	}
+
+	currentStatus.isCentered = 1;
+	STATE_FUNCS[SWP_PEAK_CENTERING].isComplete = true;
+	concludeSweepState();  // Finalize buffer updates if needed
 }
 
 /**
  * @brief Handles and logs warnings based on peak truncation flags.
  *
- * This function evaluates the truncation flags in the given `QuadraticPeakAnalysisResult` structure 
- * and logs warnings about left or right truncation. Additionally, it updates a provided context 
+ * This function evaluates the truncation flags in the given `QuadraticPeakAnalysisResult` structure
+ * and logs warnings about left or right truncation. Additionally, it updates a provided context
  * structure (e.g., `ctx`) with truncation information if necessary.
  *
  * @param result Pointer to the `QuadraticPeakAnalysisResult` containing verification results.
  * @param ctx    Pointer to a user-defined context structure to store truncation state (optional).
  */
 void handle_truncation_warnings(const QuadraticPeakAnalysisResult *result, SlidingWindowAnalysisContext *ctx) {
-    if (!result) {
-        printf("Invalid result pointer provided to handle_truncation_warnings.\n");
-        return;
-    }
+	if (!result) {
+		printf("Invalid result pointer provided to handle_truncation_warnings.\n");
+		return;
+	}
 
-    // Handle left truncation warning
-    if (result->is_truncated_left) {
-        printf("Warning: Peak verification truncated on the left side.\n");
-        if (ctx) {
-            ctx->isTruncatedLeft = true;  // Update context if provided
-        }
-    }
+	// Handle left truncation warning
+	if (result->is_truncated_left) {
+		printf("Warning: Peak verification truncated on the left side.\n");
+		if (ctx) {
+			ctx->isTruncatedLeft = true;  // Update context if provided
+		}
+	}
 
-    // Handle right truncation warning
-    if (result->is_truncated_right) {
-        printf("Warning: Peak verification truncated on the right side.\n");
-        if (ctx) {
-            ctx->isTruncatedRight = true;  // Update context if provided
-        }
-    }
+	// Handle right truncation warning
+	if (result->is_truncated_right) {
+		printf("Warning: Peak verification truncated on the right side.\n");
+		if (ctx) {
+			ctx->isTruncatedRight = true;  // Update context if provided
+		}
+	}
 
-    // If no truncations occurred
-    if (!result->is_truncated_left && !result->is_truncated_right) {
-        printf("No truncation detected in peak verification.\n");
-    }
+	// If no truncations occurred
+	if (!result->is_truncated_left && !result->is_truncated_right) {
+		printf("No truncation detected in peak verification.\n");
+	}
 }
 
 
@@ -667,32 +670,32 @@ void handle_truncation_warnings(const QuadraticPeakAnalysisResult *result, Slidi
 bool process_peak_verification(
     const QuadraticPeakAnalysisResult *result
 ) {
-    if (!result) {
-        printf("Error: Null pointer passed to process_peak_verification.\n");
-        return false;
-    }
+	if (!result) {
+		printf("Error: Null pointer passed to process_peak_verification.\n");
+		return false;
+	}
 
-    // If peak verification succeeded
-    if (result->peak_found) {
-        printf("[Success] Peak verification successful. Peak is centered at index %u.\n", result->peak_index);
+	// If peak verification succeeded
+	if (result->peak_found) {
+		printf("[Success] Peak verification successful. Peak is centered at index %u.\n", result->peak_index);
 
-        // Reset counters and mark sweep as done
-        centering_attempts = 0;                  // Reset the centering attempts counter
-        currentStatus.isSweepDone = 1;           // Mark the sweep as done
-        currentStatus.isNotCentered = 0;         // Clear the not-centered flag
-        currentStatus.isVerificationFailed = 0;   // Clear the verification failed flag
+		// Reset counters and mark sweep as done
+		centering_attempts = 0;                  // Reset the centering attempts counter
+		currentStatus.isSweepDone = 1;           // Mark the sweep as done
+		currentStatus.isNotCentered = 0;         // Clear the not-centered flag
+		currentStatus.isVerificationFailed = 0;   // Clear the verification failed flag
 
-        return true;
-    } else {
-        // If peak verification failed
-        printf("[Failure] Peak verification failed. Returning to peak centering.\n");
+		return true;
+	} else {
+		// If peak verification failed
+		printf("[Failure] Peak verification failed. Returning to peak centering.\n");
 
-        // Update status flags
-        currentStatus.isNotCentered = 1;         // Set flag to indicate the peak is not centered
-        currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failure
+		// Update status flags
+		currentStatus.isNotCentered = 1;         // Set flag to indicate the peak is not centered
+		currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failure
 
-        return false;
-    }
+		return false;
+	}
 }
 
 /**
@@ -713,29 +716,29 @@ bool process_peak_verification(
  * @see process_peak_verification
  */
 static uint16_t perform_peak_verification(void) {
-    // Perform peak verification through quadratic regression
-    int degree = 3;
-    
-        QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
-            buffer_manager.buffer,
-            buffer_manager.buffer_size,
-            buffer_manager.current_buffer_index,
-            RLS_WINDOW,  //another problem.
-            degree
-    );
-    
-    //printf("peak index of the peak: %u\n", verificationResult.peak_index);
+	// Perform peak verification through quadratic regression
+	int degree = 3;
 
-    //Print truncation warnings, if any
-    handle_truncation_warnings(&verificationResult, &ctx); // handle_truncation_warnings
+	QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
+	            buffer_manager.buffer,
+	            buffer_manager.buffer_size,
+	            buffer_manager.current_buffer_index,
+	            RLS_WINDOW,  //another problem.
+	            degree
+	        );
 
-    // Process peak verification result, if successful or not
-    if (process_peak_verification(&verificationResult)) {  //process_peak_verification
-        bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
-        if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
-    
-       return verificationResult.peak_index; // Peak is centered, no further action needed
-    }
+	//printf("peak index of the peak: %u\n", verificationResult.peak_index);
+
+	//Print truncation warnings, if any
+	handle_truncation_warnings(&verificationResult, &ctx); // handle_truncation_warnings
+
+	// Process peak verification result, if successful or not
+	if (process_peak_verification(&verificationResult)) {  //process_peak_verification
+		//bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
+		//if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
+
+		return verificationResult.peak_index; // Peak is centered, no further action needed
+	}
 }
 
 
@@ -754,41 +757,41 @@ static uint16_t perform_peak_verification(void) {
  * @see perform_peak_verification
  * @see verify_peak_centering
  */
-static void check_peak_centering_and_verify(void) { //trackGradients would solve it. 
-    // Compute total second-order gradient sum to verify peak
-    
-    // Initialize result structure
-    GradientCalculationResult result;
+static void check_peak_centering_and_verify(void) { //trackGradients would solve it.
+	// Compute total second-order gradient sum to verify peak
 
-    // Define minimum ratio (e.g., 0.3 for 30%)
-    double min_ratio = 0.3;
-    
-    bool isCentered = peakAnalysis_checkPeakCentering(  // daha dikkat etmek gerekiyor buna. 
-    buffer_manager.buffer,
-    buffer_manager.buffer_size,
-    buffer_manager.current_buffer_index,
-    min_ratio,
-    &result
-   );
-   
-   if (isCentered) {
-        printf("Valid negative trend with adequate peak capture detected.\n");
-        printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
-        currentStatus.isCentered = 1;
-        perform_peak_verification(); // should return the index. 
-        print_analysis_interval();
-    } else {
-        printf("Negative trend not found or peak not adequately captured.\n");
-        currentStatus.isCentered = 0;
-    }
-} 
+	// Initialize result structure
+	GradientCalculationResult result;
+
+	// Define minimum ratio (e.g., 0.3 for 30%)
+	double min_ratio = 0.3;
+
+	bool isCentered = peakAnalysis_checkPeakCentering(  // daha dikkat etmek gerekiyor buna.
+	                      buffer_manager.buffer,
+	                      buffer_manager.buffer_size,
+	                      buffer_manager.current_buffer_index,
+	                      min_ratio,
+	                      &result
+	                  );
+
+	if (isCentered) {
+		printf("Valid negative trend with adequate peak capture detected.\n");
+		printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
+		currentStatus.isCentered = 1;
+		perform_peak_verification(); // should return the index.
+		print_analysis_interval();
+	} else {
+		printf("Negative trend not found or peak not adequately captured.\n");
+		currentStatus.isCentered = 0;
+	}
+}
 
 
 /**
  * @brief Entry function for the SWP_PEAK_FINDING_ANALYSIS state.
  *
  * This function performs several key tasks to verify the centering and validity of the detected peak:
- * 
+ *
  * ### Step 1: Re-check the Centration of the Peak
  * - The function first computes the total sum of the second-order gradients across the current data window
  *   using a quadratic regression analysis. This sum reflects the curvature of the data and helps determine
@@ -803,7 +806,7 @@ static void check_peak_centering_and_verify(void) { //trackGradients would solve
  *   - Decreasing trends on the right side of the peak.
  * - It also accounts for truncation scenarios. If the verification process encounters the boundaries of the window before
  *   completing the necessary trend checks, truncation flags (`is_truncated_left` and `is_truncated_right`) are set.
- * 
+ *
  * ### Step 3: Handle Truncation Scenarios
  * - If the peak verification is truncated on either the left or right side, this information is logged.
  * - The function prints specific messages indicating whether truncation occurred on the left, right, or both sides
@@ -827,11 +830,11 @@ static void check_peak_centering_and_verify(void) { //trackGradients would solve
  * @see SwpProcessStateChange
  */
 static void OnEntryPeakFindingAnalysis(void) {
-    check_peak_centering_and_verify();
-    
-    // Mark the state as complete and transition to the next state
-    STATE_FUNCS[SWP_PEAK_FINDING_ANALYSIS].isComplete = true;
-    SwpProcessStateChange();  // Process the next state
+	check_peak_centering_and_verify();
+
+	// Mark the state as complete and transition to the next state
+	STATE_FUNCS[SWP_PEAK_FINDING_ANALYSIS].isComplete = true;
+	SwpProcessStateChange();  // Process the next state
 }
 
 
@@ -885,30 +888,66 @@ static void OnEntryPeakFindingAnalysis(void) {
  *   which is essential for accurate peak verification.
  */
 static void OnEntryPeakTruncationHandling(void) {
-    // Since this state may involve multiple transitions based on truncation handling, 
-    // we keep isComplete = false initially
-    STATE_FUNCS[SWP_PEAK_TRUNCATION_HANDLING].isComplete = false; 
+	// Since this state may involve multiple transitions based on truncation handling,
+	// we keep isComplete = false initially
+	STATE_FUNCS[SWP_PEAK_TRUNCATION_HANDLING].isComplete = false;
 
-    if (ctx.isTruncatedLeft) {
-        printf("Handling truncation on the left side.\n");
-        move_window_and_update_if_needed(LEFT_SIDE, PEAK_VERIFICATION_COUNT);
+	if (ctx.isTruncatedLeft) {
+		printf("Handling truncation on the left side.\n");
+		move_window_and_update_if_needed(LEFT_SIDE, PEAK_VERIFICATION_COUNT);
 
-        // Perform buffer update if needed
-        concludeSweepState();
-    }
+		// Perform buffer update if needed
+		concludeSweepState();
+	}
 
-    if (ctx.isTruncatedRight) {
-        printf("Handling truncation on the right side.\n");
-        move_window_and_update_if_needed(RIGHT_SIDE, PEAK_VERIFICATION_COUNT);
+	if (ctx.isTruncatedRight) {
+		printf("Handling truncation on the right side.\n");
+		move_window_and_update_if_needed(RIGHT_SIDE, PEAK_VERIFICATION_COUNT);
 
-        // Perform buffer update if needed
-        concludeSweepState();
-    }
+		// Perform buffer update if needed
+		concludeSweepState();
+	}
 
-    // Don't mark the state complete here since we will evaluate the outcome in OnExit
+	// Don't mark the state complete here since we will evaluate the outcome in OnExit
 }
 
+/**
+ * @brief Entry function for the SWP_EXPAND_ANALYSIS_WINDOW state.
+ *
+ * This state ensures enough data points are available for the Savitzky-Golay filter.
+ * It adjusts the buffer window by expanding it left or right as needed.
+ */
+static void OnEntryExpandAnalysisWindow(void) {
+	printf("[SWP_EXPAND_ANALYSIS_WINDOW] Expanding the analysis window for Savitzky-Golay filter.\n");
 
+	// Determine the adjusted buffer index for the current peak or center point
+	uint16_t currentAdjustedIndex = buffer_manager.current_buffer_index;
+
+	// Check proximity to boundaries using the new function
+	BoundaryProximityResult proximityResult = checkBoundaryProximity(currentAdjustedIndex, MAX_SAVGOL_WINDOW_SIZE / 2);
+
+	// Handle proximity to boundaries
+	if (proximityResult.isNearBoundary) {
+		printf("[SWP_EXPAND_ANALYSIS_WINDOW] Boundary proximity detected! Direction: %s, Move Amount: %d\n",
+		       proximityResult.direction == LEFT_SIDE ? "LEFT" : "RIGHT",
+		       proximityResult.moveAmount);
+
+		// Expand the window based on the detected proximity
+		if (proximityResult.direction == LEFT_SIDE) {
+			move_window_and_update_if_needed(LEFT_SIDE, proximityResult.moveAmount);
+		} else if (proximityResult.direction == RIGHT_SIDE) {
+			move_window_and_update_if_needed(RIGHT_SIDE, proximityResult.moveAmount);
+		}
+	} else {
+		printf("[SWP_EXPAND_ANALYSIS_WINDOW] No boundary proximity detected. No window expansion needed.\n");
+	}
+
+	// Mark the state as complete
+	STATE_FUNCS[SWP_EXPAND_ANALYSIS_WINDOW].isComplete = true;
+
+	// Transition to SWP_WAITING after expanding the window
+	concludeSweepState();
+}
 
 /**
  * @brief Entry function for the SWP_WAITING state.
@@ -917,40 +956,40 @@ static void OnEntryPeakTruncationHandling(void) {
  */
 static void OnEntryWaiting(void) {
 
-    if (currentStatus.isSweepRequested) {
-        STATE_FUNCS[SWP_WAITING].isComplete = true;
-    }
+	if (currentStatus.isSweepRequested) {
+		STATE_FUNCS[SWP_WAITING].isComplete = true;
+	}
 }
 
 /******************************************************************************/
 /* Exit Functions */
 /******************************************************************************/
 static void OnExitInitialAnalysis(void) {
-    //printf("Exiting SWP_INITIAL_ANALYSIS state.\n");
+	//printf("Exiting SWP_INITIAL_ANALYSIS state.\n");
 }
 
 static void OnExitSegmentAnalysis(void) {
-    //printf("Exiting SWP_SEGMENT_ANALYSIS state.\n");
+	//printf("Exiting SWP_SEGMENT_ANALYSIS state.\n");
 }
 
 static void OnExitUpdateBufferDirection(void) {
-    //printf("Exiting SWP_UPDATE_BUFFER_DIRECTION state.\n");
+	//printf("Exiting SWP_UPDATE_BUFFER_DIRECTION state.\n");
 }
 
 static void OnExitUndecidedTrendCase(void) {
-    //printf("Exiting SWP_UNDECIDED_TREND_CASE state.\n");
+	//printf("Exiting SWP_UNDECIDED_TREND_CASE state.\n");
 }
 
 static void OnExitPeakFindingAnalysis(void) {
-    //printf("Exiting SWP_PEAK_FINDING_ANALYSIS state.\n");
+	//printf("Exiting SWP_PEAK_FINDING_ANALYSIS state.\n");
 }
 
 static void OnExitWaiting(void) {
-    //printf("Exiting SWP_WAITING state.\n");
+	//printf("Exiting SWP_WAITING state.\n");
 }
 
 static void OnExitPeakCentering(void) {
-    //printf("Exiting SWP_PEAK_CENTERING state.\n");
+	//printf("Exiting SWP_PEAK_CENTERING state.\n");
 }
 
 /**
@@ -959,35 +998,42 @@ static void OnExitPeakCentering(void) {
  * This function handles the peak verification after truncation and buffer update are done.
  */
 static void OnExitPeakTruncationHandling(void) {
-    // Verify if the peak was successfully centered after truncation
-    
-    // Now call verifyPeakValidity with the new startIndex
-    QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
-            buffer_manager.buffer,
-            buffer_manager.buffer_size,
-            buffer_manager.current_buffer_index,
-            RLS_WINDOW,  //another problem.
-            3 //degree
-    );
+	// Verify if the peak was successfully centered after truncation
 
-    
-    if (verificationResult.peak_found && !verificationResult.is_truncated_left && !verificationResult.is_truncated_right) {
-        printf("Peak verification successful after truncation handling, peak is centered.\n");
-        print_analysis_interval();  // Print the buffer interval, comes from buffer manager. 
-        
-        bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
-        if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
-        
-        currentStatus.isSweepDone = 1;  // Mark the sweep as done
-        // Now the state is ready to transition, mark it complete
+	// Now call verifyPeakValidity with the new startIndex
+	QuadraticPeakAnalysisResult verificationResult = verifyPeakValidity(
+	            buffer_manager.buffer,
+	            buffer_manager.buffer_size,
+	            buffer_manager.current_buffer_index,
+	            RLS_WINDOW,  //another problem.
+	            3 //degree
+	        );
 
-    } else {
-        // If peak is not verified, return to peak finding analysis
-        printf("Peak verification failed after truncation handling, returning to peak finding analysis.\n");
-        currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failed
-    }
-    
-    STATE_FUNCS[SWP_PEAK_TRUNCATION_HANDLING].isComplete = true;
+
+	if (verificationResult.peak_found && !verificationResult.is_truncated_left && !verificationResult.is_truncated_right) {
+		printf("Peak verification successful after truncation handling, peak is centered.\n");
+		print_analysis_interval();  // Print the buffer interval, comes from buffer manager.
+
+		//bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
+		//if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
+		//ctx.isPeakNearBoundary = true;
+		currentStatus.isSweepDone = 1;  // Mark the sweep as done
+		// Now the state is ready to transition, mark it complete
+
+	} else {
+		// If peak is not verified, return to peak finding analysis
+		printf("Peak verification failed after truncation handling, returning to peak finding analysis.\n");
+		currentStatus.isVerificationFailed = 1;  // Set flag to indicate verification failed
+	}
+
+	STATE_FUNCS[SWP_PEAK_TRUNCATION_HANDLING].isComplete = true;
+}
+
+/**
+ * @brief Exit function for the SWP_EXPAND_ANALYSIS_WINDOW state.
+ */
+static void OnExitExpandAnalysisWindow(void) {
+	//printf("[SWP_EXPAND_ANALYSIS_WINDOW] Exiting state.\n");
 }
 
 /******************************************************************************/
@@ -1000,7 +1046,7 @@ static void OnExitPeakTruncationHandling(void) {
  * This function manages the state transitions in the sliding window analysis state machine.
  * It ensures that the appropriate OnExit and OnEntry functions are called during state transitions.
  * The state machine continues processing until no further state changes occur.
- * 
+ *
  * ### Structure and Purpose:
  * - The function uses a loop to repeatedly check if a state transition is needed.
  * - Each state is represented by a set of functions: `OnEntry`, `OnExit`, and a `isComplete` flag that indicates
@@ -1013,8 +1059,8 @@ static void OnExitPeakTruncationHandling(void) {
  *   is done. The state machine will only transition to the next state if this flag is set. If the state is not marked
  *   as complete, the next state is often determined by the logic inside the `OnExit()` function of the current state,
  *   allowing flexibility for more complex state transitions that are dependent on the exit logic of a state.
- * 
- * - **OnExit/OnEntry Functions**: 
+ *
+ * - **OnExit/OnEntry Functions**:
  *   - When a state is marked as incomplete (`!isComplete`), the `OnExit()` function (if defined) is called to handle
  *     cleanup, and potentially dictate what the next state will be.
  *   - Once a state transition is made, the `OnEntry()` function for the new state is invoked to initialize the new state's processing.
@@ -1022,116 +1068,116 @@ static void OnExitPeakTruncationHandling(void) {
  * - **State Transition (`NextState`)**: The `NextState()` function determines the next state to transition into
  *   based on the current state and flags. This function, in combination with the `OnExit()` function, ensures the
  *   correct state is selected, especially for states that require further processing or specific conditions before moving forward.
- * 
+ *
  * ### Intention:
  * - The function aims to provide flexibility in state transitions by allowing states to either fully complete and move on
  *   to the next state, or re-enter themselves if they require further processing, such as in asynchronous operations.
  * - The `OnExit()` logic allows states to determine the appropriate next state during exit, particularly useful in scenarios
  *   where a state's exit depends on external factors or complex logic.
  * - The loop ensures the state machine processes transitions in sequence without breaking the flow, making it adaptable for real-time or multi-step operations.
- * 
+ *
  * ### Working Mechanism:
  * 1. **State Completion Check**:
  *    - If the current state is incomplete (`!STATE_FUNCS[currentState].isComplete`), the function calls the `OnExit()` function (if defined)
  *      to handle cleanup and determine any next steps.
  *    - The `NextState()` function is called to determine the next state, and `stateChanged` tracks if the state has changed.
  *    - This allows a state to finalize any pending tasks in its `OnExit()` before transitioning to the next one.
- * 
+ *
  * 2. **State Transition**:
  *    - After calling `OnExit()`, the `isComplete` flag for the new state is reset, and the `OnEntry()` function for the new state is invoked.
  *    - The `currentStatus.value` is reset to ensure no status flags carry over to the next state.
- * 
+ *
  * 3. **Complete State Handling**:
  *    - If a state is marked as complete (`STATE_FUNCS[currentState].isComplete`), the function checks for the next state and processes it.
  *    - The loop continues processing state transitions until no more state changes occur.
- * 
+ *
  * 4. **Callback Handling**:
  *    - If the state machine reaches the `SWP_WAITING` state and a callback is set (`ctx.callback`), the callback is executed and cleared.
- * 
+ *
  * ### Example Use Case:
  * The function is suitable for scenarios where:
  * - Some states need multiple passes to complete their processing (e.g., waiting for an asynchronous event).
  * - Transitions between states depend on conditions evaluated during the `OnExit()` function.
  * - A callback function is executed after the state machine reaches a specific terminal state (e.g., `SWP_WAITING`).
- * 
+ *
  * ### Flexibility:
  * The function handles both synchronous and asynchronous transitions. States that require multiple iterations
  * to complete can use the `OnExit()` logic to determine the next state dynamically. Meanwhile, states that do not
  * require re-entry can transition immediately.
- * 
+ *
  * @note The state machine continues processing until no further state changes occur, ensuring all transitions are properly handled.
  *
  */
 void SwpProcessStateChange(void) {
-    bool stateChanged;
+	bool stateChanged;
 
-    // The state machine should process until no further state changes occur
-    do {
-        // If the current state is incomplete, handle its exit
-        if (!STATE_FUNCS[currentState].isComplete) {
-            // Ensure this debug message is only printed during truncation handling or incomplete states
-         
-            // Execute OnExit if it's not complete
-            if (STATE_FUNCS[currentState].onExit != NULL) {
-                STATE_FUNCS[currentState].onExit();
-            }
+	// The state machine should process until no further state changes occur
+	do {
+		// If the current state is incomplete, handle its exit
+		if (!STATE_FUNCS[currentState].isComplete) {
+			// Ensure this debug message is only printed during truncation handling or incomplete states
 
-            // Determine the next state after OnExit
-            SwpState_t nextState = NextState(currentState);
-            stateChanged = (nextState != currentState);
+			// Execute OnExit if it's not complete
+			if (STATE_FUNCS[currentState].onExit != NULL) {
+				STATE_FUNCS[currentState].onExit();
+			}
 
-            // Reset the currentStatus before transitioning
-            currentStatus.value = 0x0;
+			// Determine the next state after OnExit
+			SwpState_t nextState = NextState(currentState);
+			stateChanged = (nextState != currentState);
 
-            if (stateChanged) {
-                
-                // Ensure the old state's completion flag is set to false
-                STATE_FUNCS[currentState].isComplete = false;
-                // Move to the new state
-                currentState = nextState;
+			// Reset the currentStatus before transitioning
+			currentStatus.value = 0x0;
 
-                STATE_FUNCS[currentState].isComplete = false;
+			if (stateChanged) {
 
-                // Call the new state's OnEntry function
-                if (STATE_FUNCS[currentState].onEntry != NULL) {
-                    STATE_FUNCS[currentState].onEntry();
-                }
-            }
-        }
+				// Ensure the old state's completion flag is set to false
+				STATE_FUNCS[currentState].isComplete = false;
+				// Move to the new state
+				currentState = nextState;
 
-        // Process the state if it is marked complete
-        if (STATE_FUNCS[currentState].isComplete) {
-            //printf("[DEBUG] State %d is complete. Proceeding to next state...\n", currentState);
+				STATE_FUNCS[currentState].isComplete = false;
 
-            // Determine the next state
-            SwpState_t nextState = NextState(currentState);
-            stateChanged = (nextState != currentState);
-            
-            // Clear currentStatus flags
-            currentStatus.value = 0x0;
+				// Call the new state's OnEntry function
+				if (STATE_FUNCS[currentState].onEntry != NULL) {
+					STATE_FUNCS[currentState].onEntry();
+				}
+			}
+		}
 
-            if (stateChanged) {
-                // Transition to the new state
-                currentState = nextState;
+		// Process the state if it is marked complete
+		if (STATE_FUNCS[currentState].isComplete) {
+			//printf("[DEBUG] State %d is complete. Proceeding to next state...\n", currentState);
 
-                // Ensure the new state's completion flag is set to false
-                STATE_FUNCS[currentState].isComplete = false;
+			// Determine the next state
+			SwpState_t nextState = NextState(currentState);
+			stateChanged = (nextState != currentState);
 
-                // Call the OnEntry function for the new state
-                if (STATE_FUNCS[currentState].onEntry != NULL) {
-                    STATE_FUNCS[currentState].onEntry();
-                }
-            }
-        }
+			// Clear currentStatus flags
+			currentStatus.value = 0x0;
 
-    } while (stateChanged && STATE_FUNCS[currentState].isComplete);
+			if (stateChanged) {
+				// Transition to the new state
+				currentState = nextState;
 
-    // Handle the callback execution when we reach the waiting state
-    if (currentState == SWP_WAITING && ctx.callback) {
-        printf("[DEBUG] Executing callback as we have reached SWP_WAITING.\n");
-        ctx.callback();  // Execute the callback function
-        ctx.callback = NULL;  // Clear the callback to avoid re-execution
-    }
+				// Ensure the new state's completion flag is set to false
+				STATE_FUNCS[currentState].isComplete = false;
+
+				// Call the OnEntry function for the new state
+				if (STATE_FUNCS[currentState].onEntry != NULL) {
+					STATE_FUNCS[currentState].onEntry();
+				}
+			}
+		}
+
+	} while (stateChanged && STATE_FUNCS[currentState].isComplete);
+
+	// Handle the callback execution when we reach the waiting state
+	if (currentState == SWP_WAITING && ctx.callback) {
+		printf("[DEBUG] Executing callback as we have reached SWP_WAITING.\n");
+		ctx.callback();  // Execute the callback function
+		ctx.callback = NULL;  // Clear the callback to avoid re-execution
+	}
 }
 
 /******************************************************************************/
@@ -1148,92 +1194,98 @@ void SwpProcessStateChange(void) {
  * @return SwpState_t The next state to transition to.
  */
 static SwpState_t NextState(SwpState_t state) {
-    switch (state) {
-        case SWP_INITIAL_ANALYSIS:
-            if (currentStatus.isPeakFound) {
-                return SWP_PEAK_CENTERING;
-            }
-            if (currentStatus.isUndecided) {
-                return SWP_UNDECIDED_TREND_CASE;
-            }
-            return SWP_SEGMENT_ANALYSIS;
+	switch (state) {
+	case SWP_INITIAL_ANALYSIS:
+		if (currentStatus.isPeakFound) {
+			return SWP_PEAK_CENTERING;
+		}
+		if (currentStatus.isUndecided) {
+			return SWP_UNDECIDED_TREND_CASE;
+		}
+		return SWP_SEGMENT_ANALYSIS;
 
-        case SWP_SEGMENT_ANALYSIS:
-            if (currentStatus.isUndecided) {
-                return SWP_UNDECIDED_TREND_CASE;
-            }
-            if (currentStatus.isPeakFound) {
-                return SWP_PEAK_CENTERING;
-            }
-            if (currentStatus.isSweepDone) {
-                return SWP_WAITING;  // Transition to WAITING state if sweep is done
-            }
-        return SWP_UPDATE_BUFFER_DIRECTION;
+	case SWP_SEGMENT_ANALYSIS:
+		if (currentStatus.isUndecided) {
+			return SWP_UNDECIDED_TREND_CASE;
+		}
+		if (currentStatus.isPeakFound) {
+			return SWP_PEAK_CENTERING;
+		}
+		if (currentStatus.isSweepDone) {
+			return SWP_WAITING;  // Transition to WAITING state if sweep is done
+		}
+		return SWP_UPDATE_BUFFER_DIRECTION;
 
-        case SWP_UPDATE_BUFFER_DIRECTION:
-            if (currentStatus.isBoundaryError) {
-                return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
-            }
-            return SWP_SEGMENT_ANALYSIS;
+	case SWP_UPDATE_BUFFER_DIRECTION:
+		if (currentStatus.isBoundaryError) {
+			return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+		}
+		return SWP_SEGMENT_ANALYSIS;
 
-        case SWP_PEAK_CENTERING:
-            if (currentStatus.isBoundaryError) {
-                return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
-            }
-            if (currentStatus.isCentered) {
-                return SWP_PEAK_FINDING_ANALYSIS;
-            }
-            if (currentStatus.isSweepDone) {
-                return SWP_WAITING;
-            }
-            return SWP_PEAK_CENTERING;
+	case SWP_PEAK_CENTERING:
+		if (currentStatus.isBoundaryError) {
+			return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+		}
+		if (currentStatus.isCentered) {
+			return SWP_PEAK_FINDING_ANALYSIS;
+		}
+		if (currentStatus.isSweepDone) {
+			return SWP_EXPAND_ANALYSIS_WINDOW;
+		}
+		return SWP_PEAK_CENTERING;
 
-        case SWP_UNDECIDED_TREND_CASE:
-            // Check if undecided case counter has reached the limit
-            if (undecided_case_counter >= MAX_UNDECIDED_CASE_ATTEMPTS) {
-                return SWP_WAITING;  // Transition to SWP_WAITING if limit exceeded
-            }
-            if (currentStatus.isBoundaryError) {
-                return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
-            }
-            return SWP_SEGMENT_ANALYSIS;
+	case SWP_UNDECIDED_TREND_CASE:
+		// Check if undecided case counter has reached the limit
+		if (undecided_case_counter >= MAX_UNDECIDED_CASE_ATTEMPTS) {
+			return SWP_WAITING;  // Transition to SWP_WAITING if limit exceeded
+		}
+		if (currentStatus.isBoundaryError) {
+			return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+		}
+		return SWP_SEGMENT_ANALYSIS;
 
-        case SWP_PEAK_FINDING_ANALYSIS:
-            if (currentStatus.isBoundaryError) {
-                return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
-            }
-            if (ctx.isTruncatedLeft || ctx.isTruncatedRight) {
-                return SWP_PEAK_TRUNCATION_HANDLING;
-            }
-            if (!currentStatus.isCentered) {
-                return SWP_PEAK_CENTERING;
-            }
-            if (currentStatus.isSweepDone) {
-                return SWP_WAITING;
-            }
-            return SWP_PEAK_FINDING_ANALYSIS;
+	case SWP_PEAK_FINDING_ANALYSIS:
+		if (currentStatus.isBoundaryError) {
+			return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+		}
+		if (ctx.isTruncatedLeft || ctx.isTruncatedRight) {
+			return SWP_PEAK_TRUNCATION_HANDLING;
+		}
+		if (!currentStatus.isCentered) {
+			return SWP_PEAK_CENTERING;
+		}
+		if (currentStatus.isSweepDone) {
+			return SWP_EXPAND_ANALYSIS_WINDOW;
+		}
+		return SWP_PEAK_FINDING_ANALYSIS;
 
-        case SWP_PEAK_TRUNCATION_HANDLING:
-            if (currentStatus.isBoundaryError) {
-                return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+	case SWP_PEAK_TRUNCATION_HANDLING:
+		if (currentStatus.isBoundaryError) {
+			return SWP_WAITING;  // Transition to waiting if buffer boundary error occurred
+		}
+		if (currentStatus.isSweepDone) {
+			return SWP_EXPAND_ANALYSIS_WINDOW; // new
+		}
+		if (currentStatus.isVerificationFailed) {
+			return SWP_PEAK_FINDING_ANALYSIS;
+		}
+		return SWP_PEAK_FINDING_ANALYSIS;
+		
+	case SWP_EXPAND_ANALYSIS_WINDOW:
+            if (STATE_FUNCS[SWP_EXPAND_ANALYSIS_WINDOW].isComplete) {
+                return SWP_WAITING;  // Transition to SWP_WAITING when this state is complete
             }
-            if (currentStatus.isSweepDone) {
-                return SWP_WAITING;
-            }
-            if (currentStatus.isVerificationFailed) {
-                return SWP_PEAK_FINDING_ANALYSIS;
-            }
-            return SWP_PEAK_FINDING_ANALYSIS;
+            return SWP_EXPAND_ANALYSIS_WINDOW;
 
-        case SWP_WAITING:
-            if (currentStatus.isSweepRequested) {
-                return SWP_INITIAL_ANALYSIS;
-            }
-            return SWP_WAITING;
+	case SWP_WAITING:
+		if (currentStatus.isSweepRequested) {
+			return SWP_INITIAL_ANALYSIS;
+		}
+		return SWP_WAITING;
 
-        default:
-            return SWP_WAITING;
-    }
+	default:
+		return SWP_WAITING;
+	}
 }
 
 /**
@@ -1246,9 +1298,9 @@ static SwpState_t NextState(SwpState_t state) {
  */
 // Function to set the boundary error flag
 void set_boundary_error_flag(uint8_t flag) {
-    currentStatus.isBoundaryError = flag;
-    if (flag) {
-        boundaryErrorOccurred = true; // Set the persistent boundary error flag
-    }
+	currentStatus.isBoundaryError = flag;
+	if (flag) {
+		boundaryErrorOccurred = true; // Set the persistent boundary error flag
+	}
 }
 

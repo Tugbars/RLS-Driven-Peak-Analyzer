@@ -56,6 +56,15 @@ typedef struct {
 extern BufferManager buffer_manager;
 
 /**
+ * @brief Struct to hold the result of the boundary proximity check.
+ */
+typedef struct {
+    bool isNearBoundary;  /**< True if the index is near a boundary, false otherwise. */
+    int moveAmount;       /**< Amount of movement needed to expand the window. */
+    PeakPosition direction; /**< Direction of proximity (LEFT_SIDE or RIGHT_SIDE). */
+} BoundaryProximityResult;
+
+/**
  * @brief Initializes the BufferManager structure with starting values.
  *
  * @param buffer              Pointer to the buffer that holds the data.
@@ -126,6 +135,6 @@ void AdptSweepAddDataPoint(double real, double imaginary);
 /**
  * @brief Checks if a given adjusted buffer index is near the boundaries of the analysis interval.
  */
-bool isIndexNearBoundary(uint16_t adjustedBufferIndex, uint16_t indexIdentifier);
+BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uint16_t indexIdentifier);
 
 #endif // BUFFER_MANAGER_H

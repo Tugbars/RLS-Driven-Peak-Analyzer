@@ -45,7 +45,8 @@ typedef enum {
     SWP_UNDECIDED_TREND_CASE,
     SWP_PEAK_CENTERING,
     SWP_PEAK_FINDING_ANALYSIS,
-    SWP_PEAK_TRUNCATION_HANDLING,  // New state
+    SWP_PEAK_TRUNCATION_HANDLING,  
+    SWP_EXPAND_ANALYSIS_WINDOW, 
     SWP_WAITING,
     SWP_STATE_LAST  // This should always be last
 } SwpState_t;
@@ -83,6 +84,14 @@ typedef struct {
  */
 void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t callback);
 
+/**
+ * @brief Sets the boundary error flag in the currentStatus.
+ *
+ * This function allows external modules (like buffer_manager) to set the boundary error flag in the sliding window
+ * analysis state machine, which will trigger a state transition to SWP_WAITING.
+ *
+ * @param flag The value to set for the boundary error flag (1 for error, 0 to clear).
+ */
 void set_boundary_error_flag(uint8_t flag);
 
 #endif // SLIDING_WINDOW_ANALYSIS_H
