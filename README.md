@@ -1,4 +1,4 @@
-# Sliding Window Analysis Overview
+# RLS based Adaptive Sweep for a handheld Impedance Analyzer
 
 ## **High-Level Overview**
 
