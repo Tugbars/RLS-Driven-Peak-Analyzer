@@ -77,6 +77,7 @@
     #define DEBUG_PRINT_3(fmt, ...) do {} while(0)
 #endif
 
+#if DEBUG_LEVEL > 0
 /**
  * @brief Prints debug messages based on the debug level.
  *
@@ -95,7 +96,7 @@ static void debug_print(int level, const char *fmt, ...) {
     vprintf(fmt, args);
     va_end(args);
 }
-
+#endif
 
 /**
  * @brief Analyzes gradient trends to determine peak characteristics.
@@ -686,26 +687,6 @@ PeakCenteringResult calculatePeakCentering(const GradientTrendResultAbsolute *tr
  *
  * **Note:** This function does not modify the `startIndex`. The caller is responsible for adjusting the window position.
  *
- * @param phaseAngles    Array of phase angle data points.
- * @param startIndex     Starting index of the analysis window.
- * @param analysisLength Length of the analysis window.
- * @param degree         Degree of the polynomial used for regression.
- *
- * @return PeakCenteringResult  
- * A structure containing:
- * - `moveDirection`: Direction to move the window (`MOVE_LEFT`, `MOVE_RIGHT`, `ON_THE_PEAK`, `NO_TREND`).
- * - `moveAmount`: Amount by which to shift the window.
- * - `isCentered`: Indicates if the window is already centered on the peak.
- */
-/**
- * @brief Identifies gradient trends and calculates peak centering parameters.
- *
- * This function performs the following steps:
- * 1. Identifies first-order gradient trends within the specified analysis window.
- * 2. Calculates the required window shift to center around the detected peak based on trend durations.
- *
- * **Note:** This function does not modify the `startIndex`. The caller is responsible for adjusting the window position.
- *
  * @param data          Array of MqsRawDataPoint_t (phase angle data) to analyze.
  * @param startIndex    Starting index of the analysis window.
  * @param analysisLength Length of the analysis window.
@@ -861,20 +842,24 @@ bool peakAnalysis_checkPeakCentering(
 
                     // Check if any gradient in [trend_start_index..i] <= -1.0
                     bool threshold_reached = false;
-                    uint16_t threshold_index = 0;
+				
+#if DEBUG_LEVEL > 0
+										uint16_t threshold_index = 0; // Declare only if DEBUG_LEVEL > 0
+#endif
 
-                    for (uint16_t j = trend_start_index; j <= i; ++j) {
-                        double gVal = result->gradients[j];
-                        DEBUG_PRINT_3("Checking gradient[%u] = %.2f against threshold %.2f\n", 
-                                      j, gVal, NEGATIVE_GRADIENT_THRESHOLD);
-                        if (gVal <= NEGATIVE_GRADIENT_THRESHOLD) {
-                            threshold_reached = true;
-                            threshold_index = j;
-                            DEBUG_PRINT_2("Threshold %.2f reached at index %u.\n", NEGATIVE_GRADIENT_THRESHOLD, threshold_index);
-                            break;
-                        }
-                    }
-
+										for (uint16_t j = trend_start_index; j <= i; ++j) {
+												double gVal = result->gradients[j];
+												DEBUG_PRINT_3("Checking gradient[%u] = %.2f against threshold %.2f\n", 
+																			j, gVal, NEGATIVE_GRADIENT_THRESHOLD);
+												if (gVal <= NEGATIVE_GRADIENT_THRESHOLD) {
+														threshold_reached = true;
+#if DEBUG_LEVEL > 0
+														threshold_index = j; // Initialize only if DEBUG_LEVEL > 0
+														DEBUG_PRINT_2("Threshold %.2f reached at index %u.\n", NEGATIVE_GRADIENT_THRESHOLD, threshold_index);
+#endif
+														break;
+												}
+										}
                     if (threshold_reached) {
                         // Mark the start/end indices in the original data
                         result->startIndex = (uint16_t)(start_index + trend_start_index);
