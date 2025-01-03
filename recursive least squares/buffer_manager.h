@@ -18,6 +18,7 @@
 // Global indices for tracking analysis window
 extern int analysis_start_index;  // Track the initial start index
 extern int analysis_end_index;    // Track the final end index
+extern int buffer_shift_offset;
 
 /**
  * @struct BufferUpdateInfo
@@ -131,6 +132,19 @@ void print_analysis_interval(void);
  */
 void AdptSweepAddDataPoint(double real, double imaginary);
 
+/**
+ * @brief Calculates the adjusted buffer index based on the global analysis_start_index and buffer manager state.
+ *
+ * @return int The adjusted buffer index.
+ */
+int get_adjusted_buffer_index();
+
+/**
+ * @brief Calculates the absolute distance between the analysis start index and end index.
+ *
+ * @return int The absolute distance between the analysis interval indices. Returns -1 if the indices are not valid.
+ */
+int get_analysis_interval_distance(void);
 
 /**
  * @brief Checks if a given adjusted buffer index is near the boundaries of the analysis interval.

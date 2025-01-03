@@ -68,6 +68,15 @@ typedef struct {
 } SlidingWindowAnalysisContext;
 
 /**
+ * @struct SavgolWindowInterval
+ * @brief Struct to hold the adjusted buffer index and analysis interval distance.
+ */
+typedef struct {
+    int adjustedBufferIndex; /**< The adjusted buffer index for the analysis start index. */
+    int analysisIntervalDistance; /**< The absolute distance between analysis start and end indices. */
+} SavgolWindowInterval;
+
+/**
  * @brief Starts the sliding window analysis on the provided phase angle data.
  *
  * This function initializes and begins the sliding window analysis using the provided phase angle data.
@@ -93,5 +102,18 @@ void startSlidingWindowAnalysis(MesSweep_t *sweep, int start_index, Callback_t c
  * @param flag The value to set for the boundary error flag (1 for error, 0 to clear).
  */
 void set_boundary_error_flag(uint8_t flag);
+
+
+/**
+ * @brief Computes and returns the analysis interval information for Savitzky-Golay filtering.
+ *
+ * This function combines the adjusted buffer index and the absolute distance
+ * between the analysis start and end indices into a struct.
+ *
+ * @return SavgolWindowInterval A struct containing the adjusted buffer index and
+ *         the analysis interval distance. If indices are invalid, returns -1 for both fields.
+ */
+SavgolWindowInterval get_savgol_window_interval(void);
+
 
 #endif // SLIDING_WINDOW_ANALYSIS_H

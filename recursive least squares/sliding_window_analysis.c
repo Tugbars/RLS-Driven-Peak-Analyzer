@@ -1,5 +1,5 @@
 /**
- * @file sliding_window_analysis.c
+ * @file sliding_window_analysis_overview.h
  * @brief High-level overview and rationale behind the sliding window analysis for resonant peak detection.
  *
  * @details
@@ -127,6 +127,7 @@
 //#include <hal/ics/ics.h>
 #include <stdio.h>
 
+
 #define FORGETTING_FACTOR_ADJUSTMENT 0.2
 
 #define CENTERING_RATIO 2
@@ -239,7 +240,7 @@ static uint8_t centering_attempts = 0;
  * larger adjustments in subsequent attempts. This helps improve the accuracy of peak centering
  * over multiple attempts.
  */
-static double centering_forgetting_factor = 0.7;
+// static double centering_forgetting_factor = 0.7;
 
 /*******************************************************************************
  * Repetitive shift deadlock error control
@@ -890,7 +891,7 @@ static void check_peak_centering_and_verify(void) { //trackGradients would solve
 		printf("Start Index: %u, End Index: %u\n", result.startIndex, result.endIndex);
 		currentStatus.isCentered = 1;
 		perform_peak_verification(); // should return the index.
-		print_analysis_interval();
+		
 	} else {
 		printf("Negative trend not found or peak not adequately captured.\n");
 		currentStatus.isCentered = 0;
@@ -1029,7 +1030,7 @@ static void OnEntryPeakTruncationHandling(void) {
  * It adjusts the buffer window by expanding it left or right as needed.
  */
 static void OnEntryExpandAnalysisWindow(void) {
-	printf("[SWP_EXPAND_ANALYSIS_WINDOW] Expanding the analysis window for Savitzky-Golay filter.\n");
+	//printf("[SWP_EXPAND_ANALYSIS_WINDOW] Expanding the analysis window for Savitzky-Golay filter.\n");
 
 	// Check proximity to boundaries using the new function
 	BoundaryProximityResult proximityResult = checkBoundaryProximity(ctx.peakIndex, MAX_SAVGOL_WINDOW_SIZE / 2);
@@ -1047,8 +1048,10 @@ static void OnEntryExpandAnalysisWindow(void) {
 			move_window_and_update_if_needed(RIGHT_SIDE, proximityResult.moveAmount);
 		}
 	} else {
-		printf("[SWP_EXPAND_ANALYSIS_WINDOW] No boundary proximity detected. No window expansion needed.\n");
+		//printf("[SWP_EXPAND_ANALYSIS_WINDOW] No boundary proximity detected. No window expansion needed.\n");
 	}
+	
+	print_analysis_interval();
 
 	// Mark the state as complete
 	STATE_FUNCS[SWP_EXPAND_ANALYSIS_WINDOW].isComplete = true;
@@ -1120,11 +1123,8 @@ static void OnExitPeakTruncationHandling(void) {
 
 	if (verificationResult.peak_found && !verificationResult.is_truncated_left && !verificationResult.is_truncated_right) {
 		printf("Peak verification successful after truncation handling, peak is centered.\n");
-		print_analysis_interval();  // Print the buffer interval, comes from buffer manager.
+	
 
-		//bool isNearBoundary = isIndexNearBoundary(verificationResult.peak_index, MAX_SAVGOL_WINDOW_SIZE);
-		//if(isNearBoundary) printf("[Failure] PEAK VERY CLOSE TO BOUNDARY.\n");
-		//ctx.isPeakNearBoundary = true;
 		ctx.peakIndex = verificationResult.peak_index;
 		currentStatus.isSweepDone = 1;  // Mark the sweep as done
 		// Now the state is ready to transition, mark it complete
@@ -1411,5 +1411,33 @@ void set_boundary_error_flag(uint8_t flag) {
 	if (flag) {
 		boundaryErrorOccurred = true; // Set the persistent boundary error flag
 	}
+}
+
+
+/**
+ * @brief Computes and returns the analysis interval information for Savitzky-Golay filtering.
+ *
+ * This function combines the adjusted buffer index and the absolute distance
+ * between the analysis start and end indices into a struct.
+ *
+ * @return SavgolWindowInterval A struct containing the adjusted buffer index and
+ *         the analysis interval distance. If indices are invalid, returns -1 for both fields.
+ */
+SavgolWindowInterval get_savgol_window_interval(void) {
+    SavgolWindowInterval interval;
+
+    // Calculate the adjusted buffer index
+    if (analysis_start_index == -1 || analysis_end_index == -1) {
+        interval.adjustedBufferIndex = -1;
+        interval.analysisIntervalDistance = -1;
+    } else {
+        int relative_position = analysis_start_index - buffer_manager.current_phase_index;
+        interval.adjustedBufferIndex = (buffer_manager.current_buffer_index + relative_position - buffer_shift_offset + buffer_manager.buffer_size) % buffer_manager.buffer_size;
+
+        // Calculate the absolute distance between analysis indices
+        interval.analysisIntervalDistance = abs(analysis_end_index - analysis_start_index);
+    }
+
+    return interval;
 }
 

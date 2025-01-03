@@ -687,6 +687,26 @@ PeakCenteringResult calculatePeakCentering(const GradientTrendResultAbsolute *tr
  *
  * **Note:** This function does not modify the `startIndex`. The caller is responsible for adjusting the window position.
  *
+ * @param phaseAngles    Array of phase angle data points.
+ * @param startIndex     Starting index of the analysis window.
+ * @param analysisLength Length of the analysis window.
+ * @param degree         Degree of the polynomial used for regression.
+ *
+ * @return PeakCenteringResult  
+ * A structure containing:
+ * - `moveDirection`: Direction to move the window (`MOVE_LEFT`, `MOVE_RIGHT`, `ON_THE_PEAK`, `NO_TREND`).
+ * - `moveAmount`: Amount by which to shift the window.
+ * - `isCentered`: Indicates if the window is already centered on the peak.
+ */
+/**
+ * @brief Identifies gradient trends and calculates peak centering parameters.
+ *
+ * This function performs the following steps:
+ * 1. Identifies first-order gradient trends within the specified analysis window.
+ * 2. Calculates the required window shift to center around the detected peak based on trend durations.
+ *
+ * **Note:** This function does not modify the `startIndex`. The caller is responsible for adjusting the window position.
+ *
  * @param data          Array of MqsRawDataPoint_t (phase angle data) to analyze.
  * @param startIndex    Starting index of the analysis window.
  * @param analysisLength Length of the analysis window.

@@ -14,6 +14,25 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+/**
+ * @brief Prints the Savitzky-Golay window interval details.
+ *
+ * This function calls `get_savgol_window_interval`, retrieves the interval details,
+ * and prints them in a formatted manner for debugging or logging purposes.
+ */
+void print_savgol_window_interval(void) {
+    SavgolWindowInterval interval = get_savgol_window_interval();
+    
+    if (interval.analysisIntervalDistance == -1) {
+        printf("Invalid analysis interval. Start or end index not set.\n");
+        return;
+    }
+    
+    printf("Savitzky-Golay Window Interval:\n");
+    printf("  Adjusted Buffer Index: %d\n", interval.adjustedBufferIndex);
+    printf("  Interval Distance: %d\n", interval.analysisIntervalDistance);
+    printf("--------------------------------------\n");
+}
 
 void myCallbackFunction(void) {
     if (boundaryErrorOccurred) {
@@ -36,9 +55,12 @@ int main() {
     PrepareBaseSweep(&rawBaseSweep, rawData); 
     currentRawSweep = &rawBaseSweep;
     
-    int start_index = 162;
+    int start_index = 152; // 270 hata yapıyor
     startSlidingWindowAnalysis(currentRawSweep, start_index, myCallbackFunction); 
+    
+    //print_savgol_window_interval();
    
     return 0;
 }
 
+//too high negative value, do something about it.

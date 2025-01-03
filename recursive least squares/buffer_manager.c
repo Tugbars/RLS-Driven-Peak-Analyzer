@@ -555,7 +555,7 @@ BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uin
         return result;
     }
     
-    printf("passed peak Index: %u\n", adjustedBufferIndex);
+    //printf("passed peak Index: %u\n", adjustedBufferIndex);
 
     // Convert analysis_start_index and analysis_end_index to adjusted buffer indices
     int relativeStartPosition = analysis_start_index - buffer_manager.current_phase_index;
@@ -589,7 +589,34 @@ BoundaryProximityResult checkBoundaryProximity(uint16_t adjustedBufferIndex, uin
     }
 
     // Not near any boundary
-    printf("Adjusted Buffer Index %d is not near any boundary.\n", adjustedBufferIndex);
+    //printf("Adjusted Buffer Index %d is not near any boundary.\n", adjustedBufferIndex);
     return result;
 }
+
+
+/**
+ * @brief Calculates the adjusted buffer index based on the global analysis_start_index and buffer manager state.
+ *
+ * @return int The adjusted buffer index.
+ */
+int get_adjusted_buffer_index() {
+    int relative_position = analysis_start_index - buffer_manager.current_phase_index;
+    int adjusted_buffer_index = (buffer_manager.current_buffer_index + relative_position - buffer_shift_offset + buffer_manager.buffer_size) % buffer_manager.buffer_size;
+
+    return adjusted_buffer_index;
+}
+
+/**
+ * @brief Calculates the absolute distance between the analysis start index and end index.
+ *
+ * @return int The absolute distance between the analysis interval indices. Returns -1 if the indices are not valid.
+ */
+int get_analysis_interval_distance(void) {
+    if (analysis_start_index == -1 || analysis_end_index == -1) {
+        return -1; // Invalid indices
+    }
+
+    return abs(analysis_end_index - analysis_start_index);
+}
+
 
